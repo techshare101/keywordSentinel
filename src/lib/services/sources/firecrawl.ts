@@ -48,20 +48,41 @@ export async function searchWithFirecrawl(
   }
 ): Promise<FirecrawlSearchResult[]> {
   try {
-    const results = await getFirecrawl().search(query, {
+    console.log(`Firecrawl searching for: "${query}"`)
+    const response = await getFirecrawl().search(query, {
       limit: options?.limit || 10,
       scrapeOptions: {
         formats: ['markdown'],
       },
     })
 
-    if (!results || !Array.isArray(results)) {
+    // Debug: log raw response structure
+    const responseAny = response as any
+    console.log(`Firecrawl raw response type: ${typeof responseAny}`)
+    console.log(`Firecrawl raw response keys: ${responseAny ? Object.keys(responseAny) : 'null'}`)
+    
+    // Handle different response formats
+    let results: any[] = []
+    if (Array.isArray(responseAny)) {
+      results = responseAny
+    } else if (responseAny && typeof responseAny === 'object') {
+      // Firecrawl v1 returns { success: true, data: [...] }
+      if (responseAny.data && Array.isArray(responseAny.data)) {
+        results = responseAny.data
+      } else if (responseAny.results && Array.isArray(responseAny.results)) {
+        results = responseAny.results
+      }
+    }
+
+    console.log(`Firecrawl parsed ${results.length} results for "${query}"`)
+
+    if (results.length === 0) {
       return []
     }
 
     return results.map((item: any) => ({
       title: item.title || 'Untitled',
-      content: item.markdown || item.description || '',
+      content: item.markdown || item.description || item.content || '',
       url: item.url,
       author: extractAuthor(item.url),
       source: detectSource(item.url),
