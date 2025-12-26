@@ -46,6 +46,16 @@ export async function scanKeywordsForUser(userId: string): Promise<ScanResult[]>
     return results
   }
 
+  // Get user profile for plan and limit info
+  const { data: profile } = await supabase
+    .from('users')
+    .select('plan, email')
+    .eq('id', userId)
+    .single()
+
+  const userPlan = profile?.plan || 'free'
+  const userEmail = profile?.email
+
   // Get user settings
   const { data: settings } = await supabase
     .from('user_settings')
@@ -53,15 +63,8 @@ export async function scanKeywordsForUser(userId: string): Promise<ScanResult[]>
     .eq('user_id', userId)
     .single()
 
-  // Get user email
-  const { data: user } = await supabase
-    .from('users')
-    .select('email')
-    .eq('id', userId)
-    .single()
-
   for (const keyword of keywords) {
-    const result = await scanKeyword(keyword, settings, user?.email)
+    const result = await scanKeyword(keyword, settings, userEmail, userPlan)
     results.push(result)
   }
 
@@ -117,11 +120,14 @@ async function scanKeyword(
 
     // Analyze and store new matches
     const newMatches = []
-    const toInsert = []
+    const toInsert: any[] = []
 
-    for (const searchResult of uniqueSearchResults.slice(0, 10)) { // Limit to 10 per scan keyword to be safe
+    console.log(`Analyzing ${uniqueSearchResults.length} unique results for "${keyword.keyword}"`)
+
+    for (const searchResult of uniqueSearchResults.slice(0, 10)) {
       try {
-        // Deterministic Lead Scoring (No AI for score/bucket)
+        console.log(`Analyzing result: ${searchResult.url} from ${searchResult.source}`)
+        // Deterministic Lead Scoring
         const heuristic = calculateHeuristicScore(
           searchResult.title,
           searchResult.content,
@@ -129,16 +135,13 @@ async function scanKeyword(
           'neutral' // Default sentiment for now
         )
 
-        // AI is still used for summary and sentiment if desired, 
-        // but we prioritize the deterministic score.
-        // For now, we'll still call it for the summary but use heuristic for the bucket.
         const analysis = await analyzeMatch(
           searchResult.title,
           searchResult.content,
           keyword.keyword
         )
 
-        toInsert.push({
+        const matchData = {
           keyword_id: keyword.id,
           user_id: keyword.user_id,
           source: searchResult.source,
@@ -149,8 +152,10 @@ async function scanKeyword(
           sentiment: analysis.sentiment,
           ai_summary: analysis.summary,
           lead_score: heuristic.score,
-          lead_bucket: heuristic.bucket,
-        })
+        }
+
+        toInsert.push(matchData)
+        console.log(`Prepared match for insertion: ${searchResult.title.slice(0, 30)}...`)
       } catch (err) {
         console.error(`Error analyzing search result ${searchResult.url}:`, err)
       }

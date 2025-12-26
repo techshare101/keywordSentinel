@@ -78,29 +78,29 @@ export async function searchWithFirecrawl(
         },
       })
 
-      // Debug: log raw response structure
-      const responseAny = response as any
-      console.log(`Firecrawl raw response type: ${typeof responseAny}`)
-      console.log(`Firecrawl raw response keys: ${responseAny ? Object.keys(responseAny) : 'null'}`)
+    // Debug: log raw response structure
+    const responseAny = response as any
+    console.log(`Firecrawl raw response type: ${typeof responseAny}`)
+    console.log(`Firecrawl raw response keys: ${responseAny ? Object.keys(responseAny) : 'null'}`)
 
-      // Handle different response formats
-      let results: any[] = []
-      if (Array.isArray(responseAny)) {
-        results = responseAny
-      } else if (responseAny && typeof responseAny === 'object') {
-        // Firecrawl v1 returns { success: true, data: [...] }
-        if (responseAny.data && Array.isArray(responseAny.data)) {
-          results = responseAny.data
-        } else if (responseAny.results && Array.isArray(responseAny.results)) {
-          results = responseAny.results
-        }
+    // Handle different response formats
+    let results: any[] = []
+    if (Array.isArray(responseAny)) {
+      results = responseAny
+    } else if (responseAny && typeof responseAny === 'object') {
+      // Firecrawl v1 returns { success: true, data: [...] }
+      if (responseAny.data && Array.isArray(responseAny.data)) {
+        results = responseAny.data
+      } else if (responseAny.results && Array.isArray(responseAny.results)) {
+        results = responseAny.results
       }
+    }
 
-      console.log(`Firecrawl parsed ${results.length} results for "${query}"`)
+    console.log(`Firecrawl parsed ${results.length} results for "${query}"`)
 
-      if (results.length === 0) {
-        return []
-      }
+    if (results.length === 0) {
+      return []
+    }
 
       return results.map((item: any) => ({
         title: item.title || 'Untitled',
@@ -116,33 +116,35 @@ export async function searchWithFirecrawl(
       }))
     } catch (error: any) {
       lastError = error
-
+      
+      // Check for insufficient credits (402)
       if (error?.status === 402 || error?.message?.includes('Insufficient credits')) {
         console.error('Firecrawl credits exhausted')
         throw new FirecrawlCreditsExhaustedError('Firecrawl credits exhausted')
       }
-
+      
+      // Check for rate limit (429)
       if (error?.status === 429 || error?.message?.includes('Rate limit')) {
         console.warn(`Firecrawl rate limit hit in search (attempt ${attempt + 1}/${MAX_RETRIES + 1})`)
-
+        
         // On last attempt, throw to abort scan
         if (attempt === MAX_RETRIES) {
           throw new FirecrawlRateLimitError('Firecrawl rate limited after retries')
         }
-
+        
         // Exponential backoff: 10s, 20s
         const backoffMs = 10000 * Math.pow(2, attempt)
         console.log(`Waiting ${backoffMs}ms before retry...`)
         await sleep(backoffMs)
         continue // Retry
       }
-
+      
       // Non-rate-limit error, log and return empty
       console.error('Firecrawl search error:', error)
       return []
     }
   }
-
+  
   // If we exhausted retries
   console.error('Firecrawl search failed after retries:', lastError)
   return []
