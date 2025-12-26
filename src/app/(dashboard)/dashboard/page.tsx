@@ -247,22 +247,24 @@ export default async function DashboardPage() {
               </div>
             </Link>
 
-            <div className="flex items-center gap-4 rounded-lg border border-dashed border-slate-700 bg-gradient-to-r from-emerald-500/5 to-cyan-500/5 p-4">
-              <div className="rounded-lg bg-emerald-500/10 p-3">
-                <Zap className="h-5 w-5 text-emerald-400" />
+            {profile?.plan === 'free' && (
+              <div className="flex items-center gap-4 rounded-lg border border-dashed border-slate-700 bg-gradient-to-r from-emerald-500/5 to-cyan-500/5 p-4">
+                <div className="rounded-lg bg-emerald-500/10 p-3">
+                  <Zap className="h-5 w-5 text-emerald-400" />
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-medium text-white">Upgrade to Pro</h4>
+                  <p className="text-sm text-slate-400">
+                    Get 50 keywords and 15-minute scans
+                  </p>
+                </div>
+                <Link href="/pricing">
+                  <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                    Upgrade
+                  </Button>
+                </Link>
               </div>
-              <div className="flex-1">
-                <h4 className="font-medium text-white">Upgrade to Pro</h4>
-                <p className="text-sm text-slate-400">
-                  Get 50 keywords and 15-minute scans
-                </p>
-              </div>
-              <Link href="/pricing">
-                <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white">
-                  Upgrade
-                </Button>
-              </Link>
-            </div>
+            )}
           </CardContent>
         </Card>
       </div>
