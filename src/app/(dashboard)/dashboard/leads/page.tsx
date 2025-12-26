@@ -6,11 +6,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { 
-  Loader2, 
-  Target, 
-  TrendingUp, 
-  ExternalLink, 
+import {
+  Loader2,
+  Target,
+  TrendingUp,
+  ExternalLink,
   Star,
   MessageSquare,
   Zap,
@@ -32,17 +32,18 @@ const scoreColors: Record<string, string> = {
   cold: 'bg-slate-500',
 }
 
-const getScoreCategory = (score: number): string => {
-  if (score >= 80) return 'hot'
-  if (score >= 60) return 'warm'
-  if (score >= 40) return 'cool'
+const getScoreCategory = (match: LeadMatch): string => {
+  if (match.lead_bucket) return match.lead_bucket
+  const score = match.lead_score || 0
+  if (score >= 70) return 'hot'
+  if (score >= 40) return 'warm'
   return 'cold'
 }
 
-const getScoreLabel = (score: number): string => {
-  if (score >= 80) return '🔥 Hot Lead'
-  if (score >= 60) return '🌡️ Warm Lead'
-  if (score >= 40) return '❄️ Cool Lead'
+const getScoreLabel = (match: LeadMatch): string => {
+  const category = getScoreCategory(match)
+  if (category === 'hot') return '🔥 Hot Lead'
+  if (category === 'warm') return '🌡️ Warm Lead'
   return '🧊 Cold Lead'
 }
 
@@ -58,6 +59,7 @@ export default function LeadsPage() {
   const [leads, setLeads] = useState<LeadMatch[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'hot' | 'warm'>('all')
+  const [userPlan, setUserPlan] = useState<string>('free')
   const supabase = createClient()
 
   useEffect(() => {
@@ -67,6 +69,16 @@ export default function LeadsPage() {
   const fetchLeads = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
+
+    const { data: userProfile } = await supabase
+      .from('users')
+      .select('plan')
+      .eq('id', user.id)
+      .single()
+
+    if (userProfile) {
+      setUserPlan(userProfile.plan)
+    }
 
     const { data, error } = await supabase
       .from('matches')
@@ -85,14 +97,13 @@ export default function LeadsPage() {
 
   const filteredLeads = leads.filter(lead => {
     if (filter === 'all') return true
-    if (filter === 'hot') return (lead.lead_score || 0) >= 80
-    if (filter === 'warm') return (lead.lead_score || 0) >= 60 && (lead.lead_score || 0) < 80
-    return true
+    const category = getScoreCategory(lead)
+    return category === filter
   })
 
-  const hotCount = leads.filter(l => (l.lead_score || 0) >= 80).length
-  const warmCount = leads.filter(l => (l.lead_score || 0) >= 60 && (l.lead_score || 0) < 80).length
-  const avgScore = leads.length > 0 
+  const hotCount = leads.filter(l => getScoreCategory(l) === 'hot').length
+  const warmCount = leads.filter(l => getScoreCategory(l) === 'warm').length
+  const avgScore = leads.length > 0
     ? Math.round(leads.reduce((sum, l) => sum + (l.lead_score || 0), 0) / leads.length)
     : 0
 
@@ -117,7 +128,7 @@ export default function LeadsPage() {
 
       {/* Stats */}
       <div className="grid gap-4 md:grid-cols-4">
-        <Card className="border-slate-800 bg-slate-900">
+        <Card className="border-slate-800 bg-slate-900 shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-slate-400">Total Leads</CardTitle>
           </CardHeader>
@@ -125,23 +136,23 @@ export default function LeadsPage() {
             <div className="text-3xl font-bold text-white">{leads.length}</div>
           </CardContent>
         </Card>
-        <Card className="border-slate-800 bg-slate-900">
+        <Card className="border-slate-800 bg-slate-900 shadow-sm hover:border-red-500/20 transition-colors">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-slate-400">🔥 Hot Leads</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-red-400">{hotCount}</div>
+            <div className="text-3xl font-bold text-red-500">{hotCount}</div>
           </CardContent>
         </Card>
-        <Card className="border-slate-800 bg-slate-900">
+        <Card className="border-slate-800 bg-slate-900 shadow-sm hover:border-orange-500/20 transition-colors">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-slate-400">🌡️ Warm Leads</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-orange-400">{warmCount}</div>
+            <div className="text-3xl font-bold text-orange-500">{warmCount}</div>
           </CardContent>
         </Card>
-        <Card className="border-slate-800 bg-slate-900">
+        <Card className="border-slate-800 bg-slate-900 shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-slate-400">Avg. Score</CardTitle>
           </CardHeader>
@@ -150,6 +161,26 @@ export default function LeadsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Monetization Banner for Free users */}
+      {userPlan === 'free' && (
+        <Card className="border-emerald-500/20 bg-emerald-500/5 backdrop-blur-sm overflow-hidden group">
+          <div className="flex flex-col md:flex-row items-center justify-between p-4 gap-4">
+            <div className="flex items-center gap-4">
+              <div className="p-2 bg-emerald-500/10 rounded-lg group-hover:scale-110 transition-transform">
+                <Zap className="h-5 w-5 text-emerald-500" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white">🔥 Hot Leads are hidden on Free</h3>
+                <p className="text-xs text-slate-400">Someone is actively looking for a tool like yours right now. Upgrade to Pro to unlock real-time buyer intent.</p>
+              </div>
+            </div>
+            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white shrink-0" asChild>
+              <a href="/pricing">Unlock Hot Leads</a>
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {/* Filters */}
       <div className="flex gap-2">
@@ -181,37 +212,36 @@ export default function LeadsPage() {
         <div className="space-y-4">
           {filteredLeads.map((lead) => {
             const score = lead.lead_score || 0
-            const category = getScoreCategory(score)
-            
+            const category = getScoreCategory(lead)
+
             return (
               <Card key={lead.id} className="border-slate-800 bg-slate-900 overflow-hidden">
-                <div className="flex">
+                <div className="flex relative">
                   {/* Score Bar */}
                   <div className={`w-2 ${scoreColors[category]}`} />
-                  
+
                   <div className="flex-1 p-4">
                     <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
+                      <div className={`flex-1 min-w-0 ${userPlan === 'free' && category === 'hot' ? 'blur-sm select-none' : ''}`}>
                         <div className="flex items-center gap-2 mb-2">
                           <span className="text-lg">{sourceEmojis[lead.source]}</span>
                           <Badge variant="outline" className="border-slate-700 text-slate-300">
                             {lead.keywords?.keyword}
                           </Badge>
-                          <Badge 
-                            className={`${
-                              category === 'hot' ? 'bg-red-500/20 text-red-400 border-red-500/30' :
+                          <Badge
+                            className={`${category === 'hot' ? 'bg-red-500/20 text-red-400 border-red-500/30' :
                               category === 'warm' ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' :
-                              'bg-blue-500/20 text-blue-400 border-blue-500/30'
-                            }`}
+                                'bg-blue-500/20 text-blue-400 border-blue-500/30'
+                              }`}
                           >
-                            {getScoreLabel(score)}
+                            {getScoreLabel(lead)}
                           </Badge>
                         </div>
-                        
+
                         <h3 className="font-medium text-white mb-2 line-clamp-2">
                           {lead.title}
                         </h3>
-                        
+
                         {lead.ai_summary && (
                           <p className="text-sm text-slate-400 mb-3 line-clamp-2">
                             {lead.ai_summary}
@@ -250,28 +280,47 @@ export default function LeadsPage() {
 
                       {/* Actions */}
                       <div className="flex flex-col gap-2">
-                        <BookmarkButton
-                          matchId={lead.id}
-                          initialBookmarked={lead.is_bookmarked || false}
-                        />
-                        <ReplyGenerator
-                          matchId={lead.id}
-                          title={lead.title}
-                          content={lead.content}
-                          source={lead.source}
-                          url={lead.url}
-                        />
-                        <a
-                          href={lead.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-2 text-slate-400 hover:text-white rounded-md hover:bg-slate-800"
-                        >
-                          <ExternalLink className="h-4 w-4" />
-                        </a>
+                        {userPlan === 'free' && category === 'hot' ? (
+                          <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-xs" asChild>
+                            <a href="/pricing">Unlock</a>
+                          </Button>
+                        ) : (
+                          <>
+                            <BookmarkButton
+                              matchId={lead.id}
+                              initialBookmarked={lead.is_bookmarked || false}
+                            />
+                            <ReplyGenerator
+                              matchId={lead.id}
+                              title={lead.title}
+                              content={lead.content}
+                              source={lead.source}
+                              url={lead.url}
+                            />
+                            <a
+                              href={lead.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-2 text-slate-400 hover:text-white rounded-md hover:bg-slate-800"
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </a>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
+
+                  {/* Free Plan Overlay for Hot Leads */}
+                  {userPlan === 'free' && category === 'hot' && (
+                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-900/40 backdrop-blur-[2px]">
+                      <div className="text-center p-4">
+                        <Zap className="h-6 w-6 text-amber-500 mx-auto mb-2" />
+                        <p className="text-sm font-bold text-white mb-1">🔥 Hot Lead detected!</p>
+                        <p className="text-xs text-slate-300">Upgrade to Pro to unlock this conversion opportunity.</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </Card>
             )

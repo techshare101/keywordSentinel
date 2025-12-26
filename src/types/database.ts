@@ -83,6 +83,7 @@ export type Database = {
           sentiment: 'positive' | 'negative' | 'neutral' | null
           ai_summary: string | null
           lead_score: number | null
+          lead_bucket: string | null
           is_read: boolean
           is_bookmarked: boolean
           notes: string | null
@@ -100,6 +101,7 @@ export type Database = {
           sentiment?: 'positive' | 'negative' | 'neutral' | null
           ai_summary?: string | null
           lead_score?: number | null
+          lead_bucket?: string | null
           is_read?: boolean
           is_bookmarked?: boolean
           notes?: string | null
@@ -117,6 +119,7 @@ export type Database = {
           sentiment?: 'positive' | 'negative' | 'neutral' | null
           ai_summary?: string | null
           lead_score?: number | null
+          lead_bucket?: string | null
           is_read?: boolean
           is_bookmarked?: boolean
           notes?: string | null

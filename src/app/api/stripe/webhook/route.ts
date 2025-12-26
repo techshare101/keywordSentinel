@@ -42,12 +42,12 @@ export async function POST(request: Request) {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session
-        
+
         if (session.mode === 'subscription' && session.subscription) {
           const subscription = await getStripe().subscriptions.retrieve(
             session.subscription as string
           )
-          
+
           const userId = session.metadata?.user_id
           if (!userId) {
             console.error('No user_id in session metadata')
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
           let scanInterval = 60
           if (priceId === process.env.STRIPE_PRO_PRICE_ID) {
             plan = 'pro'
-            keywordsLimit = 50
+            keywordsLimit = 30
             scanInterval = 15
           } else if (priceId === process.env.STRIPE_TEAM_PRICE_ID) {
             plan = 'team'
@@ -87,7 +87,7 @@ export async function POST(request: Request) {
 
       case 'customer.subscription.updated': {
         const subscription = event.data.object as Stripe.Subscription
-        
+
         // Find user by subscription ID
         const { data: user } = await getSupabaseAdmin()
           .from('users')
@@ -125,7 +125,7 @@ export async function POST(request: Request) {
 
       case 'customer.subscription.deleted': {
         const subscription = event.data.object as Stripe.Subscription
-        
+
         // Find user and downgrade to free
         const { data: user } = await getSupabaseAdmin()
           .from('users')
@@ -151,7 +151,7 @@ export async function POST(request: Request) {
       case 'invoice.payment_failed': {
         const invoice = event.data.object as Stripe.Invoice
         const subscriptionId = (invoice as any).subscription
-        
+
         if (subscriptionId) {
           const { data: user } = await getSupabaseAdmin()
             .from('users')
@@ -164,7 +164,7 @@ export async function POST(request: Request) {
               .from('users')
               .update({ subscription_status: 'past_due' })
               .eq('id', user.id)
-            
+
             // TODO: Send payment failed email
             console.log(`Payment failed for user ${user.email}`)
           }

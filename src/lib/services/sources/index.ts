@@ -23,65 +23,65 @@ export interface SearchResult {
 }
 
 // Use Firecrawl if API key is available, otherwise fall back to free APIs
-const useFirecrawl = !!process.env.FIRECRAWL_API_KEY
+const FIRECRAWL_ENABLED = !!process.env.FIRECRAWL_API_KEY
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
-export async function searchAllSources(keyword: string): Promise<SearchResult[]> {
+export async function searchAllSources(keyword: string, plan: string = 'free'): Promise<SearchResult[]> {
   let results: PromiseSettledResult<SearchResult[]>[]
 
-  if (useFirecrawl) {
-    // Enhanced search with Firecrawl - Sequential to avoid rate limits
-    const firecrawlSources = [
-      searchRedditWithFirecrawl,
-      searchHNWithFirecrawl,
-      searchProductHuntWithFirecrawl,
-      searchNewsWithFirecrawl,
-    ]
+  const useFirecrawl = FIRECRAWL_ENABLED && plan !== 'free'
+  // Enhanced search with Firecrawl - Sequential to avoid rate limits
+  const firecrawlSources = [
+    searchRedditWithFirecrawl,
+    searchHNWithFirecrawl,
+    searchProductHuntWithFirecrawl,
+    searchNewsWithFirecrawl,
+  ]
 
-    const resultsArray: SearchResult[] = []
-    for (const searchFn of firecrawlSources) {
-      try {
-        const sourceResults = await searchFn(keyword)
-        resultsArray.push(...sourceResults)
-        // Add 4s delay between sources (20 req/min = 1 req per 3s minimum)
-        await sleep(4000)
-      } catch (error) {
-        if (error instanceof FirecrawlRateLimitError) {
-          throw error // Propagate to trigger scanner abort
-        }
-        console.error(`Firecrawl source search failed:`, error)
+  const resultsArray: SearchResult[] = []
+  for (const searchFn of firecrawlSources) {
+    try {
+      const sourceResults = await searchFn(keyword)
+      resultsArray.push(...sourceResults)
+      // Add 4s delay between sources (20 req/min = 1 req per 3s minimum)
+      await sleep(4000)
+    } catch (error) {
+      if (error instanceof FirecrawlRateLimitError) {
+        throw error // Propagate to trigger scanner abort
       }
-    }
-
-    // Convert to a format compatible with the rest of the function
-    const allResults = resultsArray
-    // Sort by date, newest first
-    allResults.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-    return allResults
-  } else {
-    // Free API fallback
-    results = await Promise.allSettled([
-      searchReddit(keyword),
-      searchHackerNews(keyword),
-      searchHNComments(keyword),
-      searchGoogleNews(keyword),
-      searchProductHunt(keyword),
-    ])
-  }
-
-  const allResults: SearchResult[] = []
-
-  for (const result of results) {
-    if (result.status === 'fulfilled') {
-      allResults.push(...result.value)
+      console.error(`Firecrawl source search failed:`, error)
     }
   }
 
+  // Convert to a format compatible with the rest of the function
+  const allResults = resultsArray
   // Sort by date, newest first
   allResults.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-
   return allResults
+} else {
+  // Free API fallback
+  results = await Promise.allSettled([
+    searchReddit(keyword),
+    searchHackerNews(keyword),
+    searchHNComments(keyword),
+    searchGoogleNews(keyword),
+    searchProductHunt(keyword),
+  ])
+}
+
+const allResults: SearchResult[] = []
+
+for (const result of results) {
+  if (result.status === 'fulfilled') {
+    allResults.push(...result.value)
+  }
+}
+
+// Sort by date, newest first
+allResults.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+
+return allResults
 }
 
 export async function searchSource(

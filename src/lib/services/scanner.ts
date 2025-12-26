@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { searchAllSources, type SearchResult } from './sources'
 import { FirecrawlRateLimitError, FirecrawlCreditsExhaustedError } from './sources/firecrawl'
 import { analyzeMatch } from './ai'
+import { calculateHeuristicScore } from './scoring'
 import { sendEmailAlert, sendSlackAlert, sendDiscordAlert } from './alerts'
 import type { Keyword, UserSettings } from '@/types/database'
 
@@ -70,7 +71,8 @@ export async function scanKeywordsForUser(userId: string): Promise<ScanResult[]>
 async function scanKeyword(
   keyword: Keyword,
   settings: UserSettings | null,
-  userEmail: string | undefined
+  userEmail: string | undefined,
+  plan: string = 'free'
 ): Promise<ScanResult> {
   const result: ScanResult = {
     userId: keyword.user_id,
@@ -82,8 +84,8 @@ async function scanKeyword(
 
   try {
     // Search all sources for this keyword
-    console.log(`Scanning keyword: "${keyword.keyword}"`)
-    const searchResults = await searchAllSources(keyword.keyword)
+    console.log(`Scanning keyword: "${keyword.keyword}" (Plan: ${plan})`)
+    const searchResults = await searchAllSources(keyword.keyword, plan)
 
     console.log(`Firecrawl returned ${searchResults.length} results for "${keyword.keyword}"`)
 
@@ -106,18 +108,37 @@ async function scanKeyword(
       return result
     }
 
+    // Filter out duplicates within the current search results themselves
+    const uniqueSearchResults = Array.from(
+      new Map(newResults.map(item => [item.url, item])).values()
+    )
+
+    console.log(`Unique search results to process: ${uniqueSearchResults.length}`)
+
     // Analyze and store new matches
     const newMatches = []
-    for (const searchResult of newResults.slice(0, 20)) { // Limit to 20 per scan
-      const analysis = await analyzeMatch(
-        searchResult.title,
-        searchResult.content,
-        keyword.keyword
-      )
+    const toInsert = []
 
-      const { data: match, error } = await supabase
-        .from('matches')
-        .insert({
+    for (const searchResult of uniqueSearchResults.slice(0, 10)) { // Limit to 10 per scan keyword to be safe
+      try {
+        // Deterministic Lead Scoring (No AI for score/bucket)
+        const heuristic = calculateHeuristicScore(
+          searchResult.title,
+          searchResult.content,
+          searchResult.source,
+          'neutral' // Default sentiment for now
+        )
+
+        // AI is still used for summary and sentiment if desired, 
+        // but we prioritize the deterministic score.
+        // For now, we'll still call it for the summary but use heuristic for the bucket.
+        const analysis = await analyzeMatch(
+          searchResult.title,
+          searchResult.content,
+          keyword.keyword
+        )
+
+        toInsert.push({
           keyword_id: keyword.id,
           user_id: keyword.user_id,
           source: searchResult.source,
@@ -127,14 +148,27 @@ async function scanKeyword(
           author: searchResult.author,
           sentiment: analysis.sentiment,
           ai_summary: analysis.summary,
-          lead_score: analysis.leadScore,
+          lead_score: heuristic.score,
+          lead_bucket: heuristic.bucket,
         })
-        .select('*, keywords(keyword)')
-        .single()
+      } catch (err) {
+        console.error(`Error analyzing search result ${searchResult.url}:`, err)
+      }
+    }
 
-      if (!error && match) {
-        newMatches.push(match)
-        result.matchesFound++
+    if (toInsert.length > 0) {
+      console.log(`Attempting to insert ${toInsert.length} matches for "${keyword.keyword}"`)
+      const { data: insertedData, error: insertError } = await supabase
+        .from('matches')
+        .insert(toInsert)
+        .select('*, keywords(keyword)')
+
+      if (insertError) {
+        console.error(`Failed to insert matches for "${keyword.keyword}":`, insertError)
+      } else if (insertedData) {
+        console.log(`Successfully inserted ${insertedData.length} matches for "${keyword.keyword}"`)
+        newMatches.push(...insertedData)
+        result.matchesFound = insertedData.length
       }
     }
 
@@ -260,7 +294,8 @@ export async function runFullScan(): Promise<{ usersScanned: number; totalMatche
         .eq('id', keyword.user_id)
         .single()
 
-      const result = await scanKeyword(keyword, settings, user?.email)
+      const userPlan = users?.find(u => u.id === keyword.user_id)?.plan || 'free'
+      const result = await scanKeyword(keyword, settings, user?.email, userPlan)
       totalMatches += result.matchesFound
       keywordsScanned++
       userIds.add(keyword.user_id)
@@ -272,6 +307,8 @@ export async function runFullScan(): Promise<{ usersScanned: number; totalMatche
         .eq('id', keyword.id)
 
       // Delay between keywords to respect rate limits
+      // Pro/Team get faster processing if we had concurrency, 
+      // but for now they just get priority in the queue.
       if (keywordsScanned < allKeywords.length) {
         await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_KEYWORDS_MS))
       }
