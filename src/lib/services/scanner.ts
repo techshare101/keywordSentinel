@@ -173,24 +173,81 @@ async function recordAlerts(
   await supabase.from('alerts').insert(alerts)
 }
 
-export async function runFullScan(): Promise<{ usersScanned: number; totalMatches: number }> {
+// Rate limiting: max keywords to scan per cron run to avoid Firecrawl limits
+const MAX_KEYWORDS_PER_RUN = 5
+const DELAY_BETWEEN_KEYWORDS_MS = 2000 // 2 second delay between keywords
+
+export async function runFullScan(): Promise<{ usersScanned: number; totalMatches: number; keywordsScanned: number }> {
   let usersScanned = 0
   let totalMatches = 0
+  let keywordsScanned = 0
 
   // Get all users with active keywords
   const { data: users } = await supabase
     .from('users')
-    .select('id, scan_interval_minutes')
+    .select('id, scan_interval_minutes, plan')
 
   if (!users?.length) {
-    return { usersScanned: 0, totalMatches: 0 }
+    return { usersScanned: 0, totalMatches: 0, keywordsScanned: 0 }
   }
 
-  for (const user of users) {
-    const results = await scanKeywordsForUser(user.id)
-    usersScanned++
-    totalMatches += results.reduce((sum, r) => sum + r.matchesFound, 0)
+  // Get all active keywords across all users, ordered by last_scanned (oldest first)
+  const { data: allKeywords } = await supabase
+    .from('keywords')
+    .select('*, users!inner(plan)')
+    .eq('is_active', true)
+    .order('last_scanned', { ascending: true, nullsFirst: true })
+    .limit(MAX_KEYWORDS_PER_RUN)
+
+  if (!allKeywords?.length) {
+    console.log('No active keywords to scan')
+    return { usersScanned: 0, totalMatches: 0, keywordsScanned: 0 }
   }
 
-  return { usersScanned, totalMatches }
+  const userIds = new Set<string>()
+
+  for (const keyword of allKeywords) {
+    try {
+      // Get user settings
+      const { data: settings } = await supabase
+        .from('user_settings')
+        .select('*')
+        .eq('user_id', keyword.user_id)
+        .single()
+
+      // Get user email
+      const { data: user } = await supabase
+        .from('users')
+        .select('email')
+        .eq('id', keyword.user_id)
+        .single()
+
+      const result = await scanKeyword(keyword, settings, user?.email)
+      totalMatches += result.matchesFound
+      keywordsScanned++
+      userIds.add(keyword.user_id)
+
+      // Update last_scanned timestamp
+      await supabase
+        .from('keywords')
+        .update({ last_scanned: new Date().toISOString() })
+        .eq('id', keyword.id)
+
+      // Delay between keywords to respect rate limits
+      if (keywordsScanned < allKeywords.length) {
+        await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_KEYWORDS_MS))
+      }
+    } catch (error: any) {
+      // Handle rate limit errors gracefully
+      if (error?.status === 429) {
+        console.warn(`Rate limited after ${keywordsScanned} keywords, stopping scan`)
+        break
+      }
+      console.error(`Error scanning keyword "${keyword.keyword}":`, error)
+    }
+  }
+
+  usersScanned = userIds.size
+
+  return { usersScanned, totalMatches, keywordsScanned }
 }

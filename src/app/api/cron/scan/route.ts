@@ -42,6 +42,7 @@ export async function GET(req: Request) {
       ranAt: new Date().toISOString(),
       duration: `${duration}ms`,
       usersScanned: results.usersScanned,
+      keywordsScanned: results.keywordsScanned,
       totalMatches: results.totalMatches,
     })
   } catch (error) {
