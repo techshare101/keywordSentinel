@@ -1,21 +1,31 @@
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
 import { NextResponse } from 'next/server'
 import { runFullScan } from '@/lib/services/scanner'
 
-export const dynamic = 'force-dynamic'
-
 export async function GET(req: Request) {
   // Verify the request is from Vercel Cron
-  const authHeader = req.headers.get('authorization') || req.headers.get('Authorization')
+  const authHeader = req.headers.get('authorization') ?? req.headers.get('Authorization')
   
   if (!authHeader) {
-    return new NextResponse('Missing auth header', { status: 401 })
+    console.error('❌ Missing Authorization header')
+    return new NextResponse('Unauthorized', { status: 401 })
   }
 
-  const token = authHeader.replace('Bearer ', '')
+  const token = authHeader.replace('Bearer ', '').trim()
   
-  if (token !== process.env.CRON_SECRET) {
-    return new NextResponse('Invalid cron secret', { status: 401 })
+  if (!process.env.CRON_SECRET) {
+    console.error('❌ CRON_SECRET env var missing')
+    return new NextResponse('Server misconfigured', { status: 500 })
   }
+
+  if (token !== process.env.CRON_SECRET) {
+    console.error('❌ Invalid cron secret')
+    return new NextResponse('Unauthorized', { status: 401 })
+  }
+
+  console.log('✅ Cron authorized successfully')
 
   try {
     console.log('Starting scheduled scan...')
