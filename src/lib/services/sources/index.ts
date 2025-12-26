@@ -8,6 +8,7 @@ import {
   searchHNWithFirecrawl,
   searchProductHuntWithFirecrawl,
   searchNewsWithFirecrawl,
+  FirecrawlRateLimitError,
 } from './firecrawl'
 import type { SourceType } from '@/types/database'
 
@@ -43,9 +44,12 @@ export async function searchAllSources(keyword: string): Promise<SearchResult[]>
       try {
         const sourceResults = await searchFn(keyword)
         resultsArray.push(...sourceResults)
-        // Add 1s delay between sources
-        await sleep(1000)
+        // Add 2s delay between sources for extra safety
+        await sleep(2000)
       } catch (error) {
+        if (error instanceof FirecrawlRateLimitError) {
+          throw error // Propagate to trigger scanner abort
+        }
         console.error(`Firecrawl source search failed:`, error)
       }
     }
