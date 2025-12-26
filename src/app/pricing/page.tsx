@@ -13,8 +13,8 @@ export default function PricingPage() {
   const [loading, setLoading] = useState<string | null>(null)
   const router = useRouter()
 
-  const handleSubscribe = async (plan: string, priceId: string | null) => {
-    if (!priceId) {
+  const handleSubscribe = async (plan: string) => {
+    if (plan === 'free') {
       router.push('/signup')
       return
     }
@@ -25,7 +25,7 @@ export default function PricingPage() {
       const response = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ priceId, plan }),
+        body: JSON.stringify({ plan }),
       })
 
       const data = await response.json()
@@ -104,7 +104,7 @@ export default function PricingPage() {
             <CardFooter>
               <Button
                 className="w-full bg-slate-800 hover:bg-slate-700 text-white"
-                onClick={() => handleSubscribe('free', null)}
+                onClick={() => handleSubscribe('free')}
                 disabled={loading === 'free'}
               >
                 {loading === 'free' ? (
@@ -144,7 +144,7 @@ export default function PricingPage() {
             <CardFooter>
               <Button
                 className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
-                onClick={() => handleSubscribe('pro', PLANS.pro.priceId || null)}
+                onClick={() => handleSubscribe('pro')}
                 disabled={loading === 'pro'}
               >
                 {loading === 'pro' ? (
@@ -181,7 +181,7 @@ export default function PricingPage() {
             <CardFooter>
               <Button
                 className="w-full bg-slate-800 hover:bg-slate-700 text-white"
-                onClick={() => handleSubscribe('team', PLANS.team.priceId || null)}
+                onClick={() => handleSubscribe('team')}
                 disabled={loading === 'team'}
               >
                 {loading === 'team' ? (

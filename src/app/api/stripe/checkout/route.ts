@@ -13,12 +13,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { priceId, plan } = await request.json()
+    const { plan } = await request.json()
 
-    if (!priceId || !plan) {
+    if (!plan || (plan !== 'pro' && plan !== 'team')) {
       return NextResponse.json(
-        { error: 'Missing priceId or plan' },
+        { error: 'Invalid plan' },
         { status: 400 }
+      )
+    }
+
+    // Get price ID from environment based on plan
+    const priceId = getPriceId(plan)
+    if (!priceId) {
+      return NextResponse.json(
+        { error: 'Price not configured for this plan' },
+        { status: 500 }
       )
     }
 
