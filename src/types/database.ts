@@ -14,7 +14,7 @@ export type Database = {
           id: string
           email: string
           full_name: string | null
-          plan: 'free' | 'pro' | 'agency' | 'enterprise'
+          plan: 'free' | 'pro' | 'team' | 'enterprise'
           keywords_limit: number
           scan_interval_minutes: number
           created_at: string
@@ -24,7 +24,7 @@ export type Database = {
           id: string
           email: string
           full_name?: string | null
-          plan?: 'free' | 'pro' | 'agency' | 'enterprise'
+          plan?: 'free' | 'pro' | 'team' | 'enterprise'
           keywords_limit?: number
           scan_interval_minutes?: number
           created_at?: string
@@ -34,7 +34,7 @@ export type Database = {
           id?: string
           email?: string
           full_name?: string | null
-          plan?: 'free' | 'pro' | 'agency' | 'enterprise'
+          plan?: 'free' | 'pro' | 'team' | 'enterprise'
           keywords_limit?: number
           scan_interval_minutes?: number
           created_at?: string

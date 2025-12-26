@@ -21,7 +21,7 @@ export const PLANS = {
   },
   pro: {
     name: 'Pro',
-    price: 9,
+    price: 19,
     priceId: process.env.STRIPE_PRO_PRICE_ID,
     keywords: 50,
     scanInterval: 15,
@@ -34,10 +34,10 @@ export const PLANS = {
       'CSV export',
     ],
   },
-  agency: {
-    name: 'Agency',
-    price: 29,
-    priceId: process.env.STRIPE_AGENCY_PRICE_ID,
+  team: {
+    name: 'Team',
+    price: 49,
+    priceId: process.env.STRIPE_TEAM_PRICE_ID,
     keywords: 200,
     scanInterval: 5,
     features: [

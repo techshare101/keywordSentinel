@@ -114,8 +114,8 @@ export default function SettingsPage() {
 
   const planDetails = {
     free: { name: 'Free', keywords: 3, interval: '60 min', price: '$0' },
-    pro: { name: 'Pro', keywords: 50, interval: '15 min', price: '$9/mo' },
-    agency: { name: 'Agency', keywords: 200, interval: '5 min', price: '$29/mo' },
+    pro: { name: 'Pro', keywords: 50, interval: '15 min', price: '$19/mo' },
+    team: { name: 'Team', keywords: 200, interval: '5 min', price: '$49/mo' },
     enterprise: { name: 'Enterprise', keywords: 'Unlimited', interval: '1 min', price: 'Custom' },
   }
 

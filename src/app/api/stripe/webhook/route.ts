@@ -59,8 +59,8 @@ export async function POST(request: Request) {
           let plan = 'free'
           if (priceId === process.env.STRIPE_PRO_PRICE_ID) {
             plan = 'pro'
-          } else if (priceId === process.env.STRIPE_AGENCY_PRICE_ID) {
-            plan = 'agency'
+          } else if (priceId === process.env.STRIPE_TEAM_PRICE_ID) {
+            plan = 'team'
           }
 
           // Update user subscription
@@ -92,8 +92,8 @@ export async function POST(request: Request) {
           let plan = 'free'
           if (priceId === process.env.STRIPE_PRO_PRICE_ID) {
             plan = 'pro'
-          } else if (priceId === process.env.STRIPE_AGENCY_PRICE_ID) {
-            plan = 'agency'
+          } else if (priceId === process.env.STRIPE_TEAM_PRICE_ID) {
+            plan = 'team'
           }
 
           await getSupabaseAdmin()

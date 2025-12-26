@@ -156,21 +156,21 @@ export default function PricingPage() {
             </CardFooter>
           </Card>
 
-          {/* Agency Plan */}
+          {/* Team Plan */}
           <Card className="border-slate-800 bg-slate-900 relative">
             <CardHeader>
-              <CardTitle className="text-white">{PLANS.agency.name}</CardTitle>
+              <CardTitle className="text-white">{PLANS.team.name}</CardTitle>
               <CardDescription className="text-slate-400">
                 For teams and agencies
               </CardDescription>
               <div className="mt-4">
-                <span className="text-4xl font-bold text-white">${PLANS.agency.price}</span>
+                <span className="text-4xl font-bold text-white">${PLANS.team.price}</span>
                 <span className="text-slate-400">/month</span>
               </div>
             </CardHeader>
             <CardContent>
               <ul className="space-y-3">
-                {PLANS.agency.features.map((feature) => (
+                {PLANS.team.features.map((feature) => (
                   <li key={feature} className="flex items-center gap-2 text-slate-300">
                     <Check className="h-4 w-4 text-emerald-500" />
                     {feature}
@@ -181,13 +181,13 @@ export default function PricingPage() {
             <CardFooter>
               <Button
                 className="w-full bg-slate-800 hover:bg-slate-700 text-white"
-                onClick={() => handleSubscribe('agency', PLANS.agency.priceId || null)}
-                disabled={loading === 'agency'}
+                onClick={() => handleSubscribe('team', PLANS.team.priceId || null)}
+                disabled={loading === 'team'}
               >
-                {loading === 'agency' ? (
+                {loading === 'team' ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  'Subscribe to Agency'
+                  'Subscribe to Team'
                 )}
               </Button>
             </CardFooter>

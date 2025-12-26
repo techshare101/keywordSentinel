@@ -68,7 +68,7 @@ const pricing = [
   },
   {
     name: 'Pro',
-    price: '$9',
+    price: '$19',
     period: '/month',
     description: 'For serious monitoring',
     features: ['50 keywords', '15-minute scans', 'Slack & Discord alerts', 'Advanced AI insights', 'Lead scoring', 'Priority support'],
@@ -76,8 +76,8 @@ const pricing = [
     popular: true,
   },
   {
-    name: 'Agency',
-    price: '$29',
+    name: 'Team',
+    price: '$49',
     period: '/month',
     description: 'For teams and agencies',
     features: ['200 keywords', '5-minute scans', 'All alert channels', 'Team access', 'Export reports', 'API access', 'White-label options'],
