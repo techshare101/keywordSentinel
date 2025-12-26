@@ -2,7 +2,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
-import { runFullScan } from '@/lib/scanner'
+import { runFullScan } from '@/lib/services/scanner'
 
 export async function GET(req: Request) {
   // Verify the request is from Vercel Cron
