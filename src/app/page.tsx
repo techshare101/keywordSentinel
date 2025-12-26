@@ -1,65 +1,412 @@
-import Image from "next/image";
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import {
+  Radar,
+  Search,
+  Bell,
+  Zap,
+  TrendingUp,
+  Shield,
+  ArrowRight,
+  CheckCircle,
+  MessageSquare,
+  Globe,
+  Sparkles,
+} from 'lucide-react'
 
-export default function Home() {
+const features = [
+  {
+    icon: Search,
+    title: 'Always-On Monitoring',
+    description: 'Track keywords 24/7 across Reddit, Hacker News, Product Hunt, Google News, and more.',
+  },
+  {
+    icon: Sparkles,
+    title: 'AI-Powered Summaries',
+    description: 'Get instant context on why each mention matters, with sentiment analysis and suggested actions.',
+  },
+  {
+    icon: Bell,
+    title: 'Instant Alerts',
+    description: 'Receive real-time notifications via email, Slack, or Discord the moment your keywords are mentioned.',
+  },
+  {
+    icon: TrendingUp,
+    title: 'Lead Scoring',
+    description: 'AI identifies high-value opportunities like buyers asking for solutions or competitor complaints.',
+  },
+  {
+    icon: Shield,
+    title: 'Competitor Tracking',
+    description: 'Monitor competitor mentions, sentiment, and feature requests to stay ahead.',
+  },
+  {
+    icon: Globe,
+    title: 'Multi-Source Coverage',
+    description: 'One dashboard for all your monitoring needs. No more manual searching across platforms.',
+  },
+]
+
+const sources = [
+  { name: 'Reddit', emoji: '🔴' },
+  { name: 'Hacker News', emoji: '🟠' },
+  { name: 'Product Hunt', emoji: '🟣' },
+  { name: 'Google News', emoji: '📰' },
+  { name: 'Twitter/X', emoji: '🐦' },
+]
+
+const pricing = [
+  {
+    name: 'Free',
+    price: '$0',
+    period: 'forever',
+    description: 'Perfect for getting started',
+    features: ['3 keywords', '1-hour scan interval', 'Email alerts', 'Basic AI summaries'],
+    cta: 'Get Started',
+    popular: false,
+  },
+  {
+    name: 'Pro',
+    price: '$9',
+    period: '/month',
+    description: 'For serious monitoring',
+    features: ['50 keywords', '15-minute scans', 'Slack & Discord alerts', 'Advanced AI insights', 'Lead scoring', 'Priority support'],
+    cta: 'Start Pro Trial',
+    popular: true,
+  },
+  {
+    name: 'Agency',
+    price: '$29',
+    period: '/month',
+    description: 'For teams and agencies',
+    features: ['200 keywords', '5-minute scans', 'All alert channels', 'Team access', 'Export reports', 'API access', 'White-label options'],
+    cta: 'Contact Sales',
+    popular: false,
+  },
+]
+
+const testimonials = [
+  {
+    quote: "KeywordSentinel helped us catch 3 enterprise leads in the first week. The AI summaries saved us hours of manual review.",
+    author: "Sarah Chen",
+    role: "Founder, SaaSMetrics",
+  },
+  {
+    quote: "Finally, a monitoring tool that actually tells me what to do with each mention. Game changer for our sales team.",
+    author: "Marcus Johnson",
+    role: "Head of Growth, TechFlow",
+  },
+  {
+    quote: "We track competitor mentions and pain points. It's like having a research team working 24/7.",
+    author: "Emily Rodriguez",
+    role: "Product Manager, CloudBase",
+  },
+]
+
+export default function LandingPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <div className="min-h-screen bg-slate-950">
+      {/* Navigation */}
+      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-slate-800 bg-slate-950/80 backdrop-blur-lg">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex h-16 items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500">
+                <Radar className="h-5 w-5 text-white" />
+              </div>
+              <span className="text-lg font-bold text-white">KeywordSentinel</span>
+            </div>
+            <div className="hidden md:flex items-center gap-8">
+              <a href="#features" className="text-sm text-slate-400 hover:text-white transition-colors">Features</a>
+              <a href="#pricing" className="text-sm text-slate-400 hover:text-white transition-colors">Pricing</a>
+              <a href="#testimonials" className="text-sm text-slate-400 hover:text-white transition-colors">Testimonials</a>
+            </div>
+            <div className="flex items-center gap-4">
+              <Link href="/login">
+                <Button variant="ghost" className="text-slate-300 hover:text-white">
+                  Log in
+                </Button>
+              </Link>
+              <Link href="/signup">
+                <Button className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                  Get Started Free
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      {/* Hero Section */}
+      <section className="relative pt-32 pb-20 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/10 via-transparent to-transparent" />
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-500/20 rounded-full blur-3xl" />
+        <div className="absolute top-1/3 right-1/4 w-96 h-96 bg-cyan-500/20 rounded-full blur-3xl" />
+        
+        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
+          <Badge className="mb-6 bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20">
+            <Sparkles className="mr-1 h-3 w-3" />
+            AI-Powered Keyword Monitoring
+          </Badge>
+          
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight mb-6">
+            Know When Anyone Mentions
+            <br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">
+              What Matters to You
+            </span>
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          
+          <p className="text-xl text-slate-400 max-w-2xl mx-auto mb-8">
+            Monitor Reddit, Hacker News, Product Hunt, and more. Get instant AI-powered alerts 
+            with context, sentiment, and suggested actions.
           </p>
+          
+          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
+            <Link href="/signup">
+              <Button size="lg" className="bg-emerald-600 hover:bg-emerald-700 text-white text-lg px-8 h-14">
+                Start Monitoring Free
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+            </Link>
+            <Button size="lg" variant="outline" className="border-slate-700 text-slate-300 hover:bg-slate-800 text-lg px-8 h-14">
+              Watch Demo
+            </Button>
+          </div>
+          
+          <div className="flex items-center justify-center gap-6 text-sm text-slate-500">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 text-emerald-500" />
+              No credit card required
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 text-emerald-500" />
+              3 keywords free forever
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 text-emerald-500" />
+              Setup in 2 minutes
+            </div>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </section>
+
+      {/* Sources Section */}
+      <section className="py-12 border-y border-slate-800 bg-slate-900/50">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <p className="text-center text-sm text-slate-500 mb-6">MONITORING SOURCES</p>
+          <div className="flex flex-wrap items-center justify-center gap-8">
+            {sources.map((source) => (
+              <div key={source.name} className="flex items-center gap-2 text-slate-400">
+                <span className="text-2xl">{source.emoji}</span>
+                <span className="font-medium">{source.name}</span>
+              </div>
+            ))}
+          </div>
         </div>
-      </main>
+      </section>
+
+      {/* Features Section */}
+      <section id="features" className="py-24">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <Badge className="mb-4 bg-slate-800 text-slate-300 border-slate-700">Features</Badge>
+            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
+              Everything You Need to Stay Informed
+            </h2>
+            <p className="text-lg text-slate-400 max-w-2xl mx-auto">
+              Stop manually searching. Let AI do the heavy lifting while you focus on what matters.
+            </p>
+          </div>
+          
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {features.map((feature) => (
+              <div
+                key={feature.title}
+                className="p-6 rounded-xl border border-slate-800 bg-slate-900/50 hover:bg-slate-900 transition-colors"
+              >
+                <div className="w-12 h-12 rounded-lg bg-emerald-500/10 flex items-center justify-center mb-4">
+                  <feature.icon className="h-6 w-6 text-emerald-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-white mb-2">{feature.title}</h3>
+                <p className="text-slate-400">{feature.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* How It Works */}
+      <section className="py-24 bg-slate-900/50">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <Badge className="mb-4 bg-slate-800 text-slate-300 border-slate-700">How It Works</Badge>
+            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
+              From Keyword to Opportunity in 3 Steps
+            </h2>
+          </div>
+          
+          <div className="grid md:grid-cols-3 gap-8">
+            <div className="text-center">
+              <div className="w-16 h-16 rounded-full bg-emerald-500/10 border-2 border-emerald-500/30 flex items-center justify-center mx-auto mb-6">
+                <span className="text-2xl font-bold text-emerald-400">1</span>
+              </div>
+              <h3 className="text-xl font-semibold text-white mb-2">Add Your Keywords</h3>
+              <p className="text-slate-400">
+                Enter keywords, competitor names, or pain points you want to track.
+              </p>
+            </div>
+            <div className="text-center">
+              <div className="w-16 h-16 rounded-full bg-emerald-500/10 border-2 border-emerald-500/30 flex items-center justify-center mx-auto mb-6">
+                <span className="text-2xl font-bold text-emerald-400">2</span>
+              </div>
+              <h3 className="text-xl font-semibold text-white mb-2">We Scan 24/7</h3>
+              <p className="text-slate-400">
+                Our system monitors Reddit, HN, Product Hunt, and news sources continuously.
+              </p>
+            </div>
+            <div className="text-center">
+              <div className="w-16 h-16 rounded-full bg-emerald-500/10 border-2 border-emerald-500/30 flex items-center justify-center mx-auto mb-6">
+                <span className="text-2xl font-bold text-emerald-400">3</span>
+              </div>
+              <h3 className="text-xl font-semibold text-white mb-2">Get AI Insights</h3>
+              <p className="text-slate-400">
+                Receive instant alerts with summaries, sentiment, and recommended actions.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing Section */}
+      <section id="pricing" className="py-24">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <Badge className="mb-4 bg-slate-800 text-slate-300 border-slate-700">Pricing</Badge>
+            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
+              Simple, Transparent Pricing
+            </h2>
+            <p className="text-lg text-slate-400">
+              Start free. Upgrade when you need more power.
+            </p>
+          </div>
+          
+          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            {pricing.map((plan) => (
+              <div
+                key={plan.name}
+                className={`relative p-8 rounded-xl border ${
+                  plan.popular
+                    ? 'border-emerald-500 bg-gradient-to-b from-emerald-500/10 to-transparent'
+                    : 'border-slate-800 bg-slate-900/50'
+                }`}
+              >
+                {plan.popular && (
+                  <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-emerald-500 text-white border-0">
+                    Most Popular
+                  </Badge>
+                )}
+                <div className="text-center mb-6">
+                  <h3 className="text-xl font-semibold text-white mb-2">{plan.name}</h3>
+                  <div className="flex items-baseline justify-center gap-1">
+                    <span className="text-4xl font-bold text-white">{plan.price}</span>
+                    <span className="text-slate-400">{plan.period}</span>
+                  </div>
+                  <p className="text-sm text-slate-400 mt-2">{plan.description}</p>
+                </div>
+                <ul className="space-y-3 mb-8">
+                  {plan.features.map((feature) => (
+                    <li key={feature} className="flex items-center gap-2 text-slate-300">
+                      <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" />
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+                <Link href="/signup" className="block">
+                  <Button
+                    className={`w-full ${
+                      plan.popular
+                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                        : 'bg-slate-800 hover:bg-slate-700 text-white'
+                    }`}
+                  >
+                    {plan.cta}
+                  </Button>
+                </Link>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonials */}
+      <section id="testimonials" className="py-24 bg-slate-900/50">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <Badge className="mb-4 bg-slate-800 text-slate-300 border-slate-700">Testimonials</Badge>
+            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
+              Loved by Founders & Teams
+            </h2>
+          </div>
+          
+          <div className="grid md:grid-cols-3 gap-8">
+            {testimonials.map((testimonial, i) => (
+              <div
+                key={i}
+                className="p-6 rounded-xl border border-slate-800 bg-slate-900/50"
+              >
+                <MessageSquare className="h-8 w-8 text-emerald-500/50 mb-4" />
+                <p className="text-slate-300 mb-6">&ldquo;{testimonial.quote}&rdquo;</p>
+                <div>
+                  <p className="font-medium text-white">{testimonial.author}</p>
+                  <p className="text-sm text-slate-500">{testimonial.role}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="py-24">
+        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
+            Ready to Never Miss a Mention?
+          </h2>
+          <p className="text-lg text-slate-400 mb-8">
+            Join hundreds of founders and teams who use KeywordSentinel to stay ahead.
+          </p>
+          <Link href="/signup">
+            <Button size="lg" className="bg-emerald-600 hover:bg-emerald-700 text-white text-lg px-8 h-14">
+              Start Monitoring Free
+              <ArrowRight className="ml-2 h-5 w-5" />
+            </Button>
+          </Link>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="py-12 border-t border-slate-800">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500">
+                <Radar className="h-4 w-4 text-white" />
+              </div>
+              <span className="font-bold text-white">KeywordSentinel</span>
+            </div>
+            <div className="flex items-center gap-6 text-sm text-slate-400">
+              <a href="#" className="hover:text-white transition-colors">Privacy</a>
+              <a href="#" className="hover:text-white transition-colors">Terms</a>
+              <a href="#" className="hover:text-white transition-colors">Contact</a>
+            </div>
+            <p className="text-sm text-slate-500">
+              © 2024 KeywordSentinel. All rights reserved.
+            </p>
+          </div>
+        </div>
+      </footer>
     </div>
-  );
+  )
 }
