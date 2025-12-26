@@ -2,7 +2,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { runFullScan } from '@/lib/scanner'
 
 export async function GET(req: Request) {
   // Verify the request is from Vercel Cron
@@ -22,47 +22,16 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Invalid cron secret' }, { status: 401 })
   }
 
-  // Debug: Check env vars
-  const debugInfo: Record<string, any> = {
-    hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-    hasServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-    supabaseUrlPrefix: process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 30) + '...',
-  }
-
   try {
-    // Create Supabase client directly here for debugging
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-
-    // Test query: count users
-    const { data: users, error: usersError } = await supabase
-      .from('users')
-      .select('id')
-    
-    debugInfo.usersCount = users?.length || 0
-    debugInfo.usersError = usersError?.message || null
-
-    // Test query: count active keywords
-    const { data: keywords, error: keywordsError } = await supabase
-      .from('keywords')
-      .select('id, keyword, is_active')
-      .eq('is_active', true)
-    
-    debugInfo.keywordsCount = keywords?.length || 0
-    debugInfo.keywordsError = keywordsError?.message || null
-    debugInfo.keywordsSample = keywords?.slice(0, 3).map(k => k.keyword) || []
-
+    const result = await runFullScan()
     return NextResponse.json({
       ok: true,
-      debug: debugInfo,
-      ranAt: new Date().toISOString(),
+      ...result,
     })
   } catch (error) {
+    console.error('Cron scan error:', error)
     return NextResponse.json({
       ok: false,
-      debug: debugInfo,
       error: (error as Error).message,
     }, { status: 500 })
   }
