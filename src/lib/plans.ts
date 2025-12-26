@@ -7,22 +7,25 @@ export const PLANS = {
     scanInterval: 60, // minutes
     features: [
       '3 keywords',
-      'Hourly scans',
+      'Delayed scans',
       'Email alerts',
-      'AI summaries',
+      'Basic AI analysis',
+      'Limited Lead insights',
+      '❌ No Hot Leads',
     ],
   },
   pro: {
     name: 'Pro',
     price: 19,
     priceId: null as string | null, // Set at runtime from env
-    keywords: 50,
+    keywords: 30,
     scanInterval: 15,
     features: [
-      '50 keywords',
-      '15-minute scans',
+      '30 keywords',
+      '15-minute priority scans',
+      'Unlock 🔥 Hot Leads',
       'Email, Slack & Discord alerts',
-      'AI summaries & lead scoring',
+      'Full AI summaries & sentiment',
       'Weekly digest',
       'CSV export',
     ],
@@ -35,11 +38,11 @@ export const PLANS = {
     scanInterval: 5,
     features: [
       '200 keywords',
-      '5-minute scans',
+      '5-minute instant scans',
       'All Pro features',
-      'Priority support',
-      'API access',
-      'Webhooks',
+      'Priority team support',
+      'API & Webhook access',
+      'Advanced Lead filtering',
     ],
   },
 } as const
