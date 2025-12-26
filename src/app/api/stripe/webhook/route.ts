@@ -4,10 +4,14 @@ import { stripe } from '@/lib/stripe'
 import { createClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+export const dynamic = 'force-dynamic'
+
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 export async function POST(request: Request) {
   const body = await request.text()
@@ -60,7 +64,7 @@ export async function POST(request: Request) {
           }
 
           // Update user subscription
-          await supabaseAdmin
+          await getSupabaseAdmin()
             .from('users')
             .update({
               stripe_customer_id: session.customer as string,
@@ -77,7 +81,7 @@ export async function POST(request: Request) {
         const subscription = event.data.object as Stripe.Subscription
         
         // Find user by subscription ID
-        const { data: user } = await supabaseAdmin
+        const { data: user } = await getSupabaseAdmin()
           .from('users')
           .select('id')
           .eq('stripe_subscription_id', subscription.id)
@@ -92,7 +96,7 @@ export async function POST(request: Request) {
             plan = 'agency'
           }
 
-          await supabaseAdmin
+          await getSupabaseAdmin()
             .from('users')
             .update({
               subscription_status: subscription.status,
@@ -107,14 +111,14 @@ export async function POST(request: Request) {
         const subscription = event.data.object as Stripe.Subscription
         
         // Find user and downgrade to free
-        const { data: user } = await supabaseAdmin
+        const { data: user } = await getSupabaseAdmin()
           .from('users')
           .select('id')
           .eq('stripe_subscription_id', subscription.id)
           .single()
 
         if (user) {
-          await supabaseAdmin
+          await getSupabaseAdmin()
             .from('users')
             .update({
               subscription_status: 'canceled',
@@ -131,14 +135,14 @@ export async function POST(request: Request) {
         const subscriptionId = (invoice as any).subscription
         
         if (subscriptionId) {
-          const { data: user } = await supabaseAdmin
+          const { data: user } = await getSupabaseAdmin()
             .from('users')
             .select('id, email')
             .eq('stripe_subscription_id', subscriptionId as string)
             .single()
 
           if (user) {
-            await supabaseAdmin
+            await getSupabaseAdmin()
               .from('users')
               .update({ subscription_status: 'past_due' })
               .eq('id', user.id)

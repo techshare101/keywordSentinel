@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { generateDigestForUser, sendWeeklyDigest, sendAllWeeklyDigests } from '@/lib/services/digest'
 
+export const dynamic = 'force-dynamic'
+
 // Send digest to a specific user (for testing or manual trigger)
 export async function POST(request: Request) {
   try {

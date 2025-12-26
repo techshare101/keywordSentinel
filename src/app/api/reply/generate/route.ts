@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { generateReply } from '@/lib/services/reply-generator'
 
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()

@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { scanKeywordsForUser } from '@/lib/services/scanner'
 
+export const dynamic = 'force-dynamic'
+
 export async function POST() {
   try {
     const supabase = await createClient()
