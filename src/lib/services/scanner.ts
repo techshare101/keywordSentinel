@@ -8,14 +8,14 @@ import type { Keyword, UserSettings } from '@/types/database'
 function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  
+
   console.log(`Supabase URL exists: ${!!url}`)
   console.log(`Supabase Service Role Key exists: ${!!key}`)
-  
+
   if (!url || !key) {
     throw new Error(`Missing Supabase env vars: URL=${!!url}, KEY=${!!key}`)
   }
-  
+
   return createClient(url, key)
 }
 
@@ -83,9 +83,9 @@ async function scanKeyword(
     // Search all sources for this keyword
     console.log(`Scanning keyword: "${keyword.keyword}"`)
     const searchResults = await searchAllSources(keyword.keyword)
-    
+
     console.log(`Firecrawl returned ${searchResults.length} results for "${keyword.keyword}"`)
-    
+
     if (searchResults.length === 0) {
       return result
     }
@@ -215,7 +215,7 @@ export async function runFullScan(): Promise<{ usersScanned: number; totalMatche
     .from('keywords')
     .select('*')
     .eq('is_active', true)
-    .order('created_at', { ascending: true })
+    .order('last_scanned', { ascending: true, nullsFirst: true })
     .limit(MAX_KEYWORDS_PER_RUN)
 
   console.log(`Found ${allKeywords?.length || 0} active keywords, error: ${keywordsError?.message || 'none'}`)
@@ -248,7 +248,7 @@ export async function runFullScan(): Promise<{ usersScanned: number; totalMatche
       keywordsScanned++
       userIds.add(keyword.user_id)
 
-      // Update last_scanned timestamp
+      // Update last_scanned timestamp AFTER processing
       await supabase
         .from('keywords')
         .update({ last_scanned: new Date().toISOString() })
