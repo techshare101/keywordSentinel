@@ -83,36 +83,32 @@ export default function KeywordsPage() {
     }
 
     setAdding(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
 
-    const { data, error } = await supabase
-      .from('keywords')
-      .insert({
-        user_id: user.id,
-        keyword: newKeyword.trim().toLowerCase(),
+    try {
+      const response = await fetch('/api/keywords', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keyword: newKeyword.trim() }),
       })
-      .select()
-      .single()
 
-    if (error) {
-      console.error('Add keyword error:', error)
-      if (error.code === '23505') {
-        toast.error('This keyword already exists')
-      } else if (error.code === '23503') {
-        toast.error('User profile not found. Please sign out and sign in again.')
-      } else {
-        toast.error(`Failed to add keyword: ${error.message}`)
+      const data = await response.json()
+
+      if (!response.ok) {
+        toast.error(data.error || 'Failed to add keyword')
+        setAdding(false)
+        return
       }
-      setAdding(false)
-      return
-    }
 
-    setKeywords([data, ...keywords])
-    setNewKeyword('')
-    setDialogOpen(false)
-    setAdding(false)
-    toast.success('Keyword added successfully')
+      setKeywords([data, ...keywords])
+      setNewKeyword('')
+      setDialogOpen(false)
+      toast.success('Keyword added successfully')
+    } catch (error) {
+      console.error('Add keyword error:', error)
+      toast.error('Failed to add keyword')
+    } finally {
+      setAdding(false)
+    }
   }
 
   const toggleKeyword = async (id: string, isActive: boolean) => {

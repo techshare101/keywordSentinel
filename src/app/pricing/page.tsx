@@ -30,14 +30,26 @@ export default function PricingPage() {
 
       const data = await response.json()
 
+      if (!response.ok) {
+        console.error('Checkout error:', data.error)
+        if (response.status === 401) {
+          // User not logged in, redirect to signup
+          router.push('/signup?plan=' + plan)
+        } else {
+          alert(data.error || 'Failed to start checkout')
+        }
+        return
+      }
+
       if (data.url) {
         window.location.href = data.url
       } else {
-        // User not logged in, redirect to signup
-        router.push('/signup?plan=' + plan)
+        console.error('No checkout URL returned')
+        alert('Failed to create checkout session')
       }
     } catch (error) {
       console.error('Checkout error:', error)
+      alert('Failed to start checkout. Please try again.')
     } finally {
       setLoading(null)
     }
