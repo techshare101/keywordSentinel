@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { searchAllSources, type SearchResult } from './sources'
+import { FirecrawlRateLimitError } from './sources/firecrawl'
 import { analyzeMatch } from './ai'
 import { sendEmailAlert, sendSlackAlert, sendDiscordAlert } from './alerts'
 import type { Keyword, UserSettings } from '@/types/database'
@@ -190,13 +191,27 @@ async function recordAlerts(
 }
 
 // Rate limiting: max keywords to scan per cron run to avoid Firecrawl limits
-const MAX_KEYWORDS_PER_RUN = 5
-const DELAY_BETWEEN_KEYWORDS_MS = 2000 // 2 second delay between keywords
+const MAX_KEYWORDS_PER_RUN = 3
+const DELAY_BETWEEN_KEYWORDS_MS = 5000 // 5 second delay between keywords
 
 export async function runFullScan(): Promise<{ usersScanned: number; totalMatches: number; keywordsScanned: number }> {
+  const startedAt = Date.now()
   let usersScanned = 0
   let totalMatches = 0
   let keywordsScanned = 0
+
+  // Register scan run
+  const { data: scanRun, error: scanRunError } = await supabase
+    .from('scan_runs')
+    .insert({})
+    .select()
+    .single()
+
+  if (scanRunError) {
+    console.error('Failed to create scan run entry:', scanRunError)
+  }
+
+  const scanRunId = scanRun?.id
 
   // Get all users with active keywords
   const { data: users, error: usersError } = await supabase
@@ -259,9 +274,23 @@ export async function runFullScan(): Promise<{ usersScanned: number; totalMatche
         await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_KEYWORDS_MS))
       }
     } catch (error: any) {
-      // Handle rate limit errors gracefully
-      if (error?.status === 429) {
-        console.warn(`Rate limited after ${keywordsScanned} keywords, stopping scan`)
+      if (error instanceof FirecrawlRateLimitError || error?.status === 429) {
+        console.warn(`Rate limited during "${keyword.keyword}", stopping full scan to save quota`)
+
+        // Log abort status
+        if (scanRunId) {
+          await supabase
+            .from('scan_runs')
+            .update({
+              aborted: true,
+              error: 'rate_limited',
+              finished_at: new Date().toISOString(),
+              keywords_scanned: keywordsScanned,
+              matches_found: totalMatches,
+              duration_ms: Date.now() - startedAt,
+            })
+            .eq('id', scanRunId)
+        }
         break
       }
       console.error(`Error scanning keyword "${keyword.keyword}":`, error)
@@ -269,6 +298,19 @@ export async function runFullScan(): Promise<{ usersScanned: number; totalMatche
   }
 
   usersScanned = userIds.size
+
+  // Log successful completion
+  if (scanRunId) {
+    await supabase
+      .from('scan_runs')
+      .update({
+        finished_at: new Date().toISOString(),
+        keywords_scanned: keywordsScanned,
+        matches_found: totalMatches,
+        duration_ms: Date.now() - startedAt,
+      })
+      .eq('id', scanRunId)
+  }
 
   return { usersScanned, totalMatches, keywordsScanned }
 }

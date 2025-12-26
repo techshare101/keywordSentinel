@@ -2,10 +2,10 @@ import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { 
-  Search, 
-  TrendingUp, 
-  Bell, 
+import {
+  Search,
+  TrendingUp,
+  Bell,
   Zap,
   ArrowUpRight,
   MessageSquare,
@@ -14,6 +14,7 @@ import {
 import Link from 'next/link'
 import { ScanButton } from '@/components/dashboard/scan-button'
 import { DigestButton } from '@/components/dashboard/digest-button'
+import { ScanMetrics } from '@/components/dashboard/scan-metrics'
 
 const sourceIcons: Record<string, string> = {
   reddit: '🔴',
@@ -31,9 +32,9 @@ const sentimentColors: Record<string, string> = {
 
 export default async function DashboardPage() {
   const supabase = await createClient()
-  
+
   const { data: { user } } = await supabase.auth.getUser()
-  
+
   const { data: profile } = await supabase
     .from('users')
     .select('*')
@@ -103,9 +104,9 @@ export default async function DashboardPage() {
           <p className="text-slate-400">Monitor your keywords and track mentions across the web.</p>
         </div>
         <div className="flex items-center gap-3">
-          <DigestButton 
-            variant="outline" 
-            className="border-slate-700 text-slate-300 hover:bg-slate-800" 
+          <DigestButton
+            variant="outline"
+            className="border-slate-700 text-slate-300 hover:bg-slate-800"
           />
           <ScanButton className="bg-emerald-600 hover:bg-emerald-700 text-white" />
         </div>
@@ -137,79 +138,83 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="border-slate-800 bg-slate-900">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="text-white">Recent Matches</CardTitle>
-              <CardDescription className="text-slate-400">
-                Latest keyword mentions from across the web
-              </CardDescription>
-            </div>
-            <Link href="/dashboard/matches">
-              <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white">
-                View all
-                <ArrowUpRight className="ml-1 h-4 w-4" />
-              </Button>
-            </Link>
-          </CardHeader>
-          <CardContent>
-            {recentMatches && recentMatches.length > 0 ? (
-              <div className="space-y-4">
-                {recentMatches.map((match: any) => (
-                  <div
-                    key={match.id}
-                    className="flex items-start gap-4 rounded-lg border border-slate-800 bg-slate-800/50 p-4"
-                  >
-                    <div className="text-2xl">
-                      {sourceIcons[match.source] || '🌐'}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Badge variant="outline" className="text-xs border-slate-700 text-slate-400">
-                          {match.keywords?.keyword}
-                        </Badge>
-                        {match.sentiment && (
-                          <Badge variant="outline" className={`text-xs ${sentimentColors[match.sentiment]}`}>
-                            {match.sentiment}
-                          </Badge>
-                        )}
-                      </div>
-                      <h4 className="font-medium text-white truncate">{match.title}</h4>
-                      <p className="text-sm text-slate-400 line-clamp-2 mt-1">
-                        {match.ai_summary || match.content}
-                      </p>
-                      <div className="flex items-center gap-4 mt-2 text-xs text-slate-500">
-                        <span>{match.source}</span>
-                        <span>{new Date(match.created_at).toLocaleDateString()}</span>
-                      </div>
-                    </div>
-                    <a
-                      href={match.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-slate-400 hover:text-white"
+        <div className="space-y-6">
+          <ScanMetrics />
+
+          <Card className="border-slate-800 bg-slate-900">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-white">Recent Matches</CardTitle>
+                <CardDescription className="text-slate-400">
+                  Latest keyword mentions from across the web
+                </CardDescription>
+              </div>
+              <Link href="/dashboard/matches">
+                <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white">
+                  View all
+                  <ArrowUpRight className="ml-1 h-4 w-4" />
+                </Button>
+              </Link>
+            </CardHeader>
+            <CardContent>
+              {recentMatches && recentMatches.length > 0 ? (
+                <div className="space-y-4">
+                  {recentMatches.map((match: any) => (
+                    <div
+                      key={match.id}
+                      className="flex items-start gap-4 rounded-lg border border-slate-800 bg-slate-800/50 p-4"
                     >
-                      <ExternalLink className="h-4 w-4" />
-                    </a>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-8 text-center">
-                <MessageSquare className="h-12 w-12 text-slate-600 mb-4" />
-                <h3 className="text-lg font-medium text-white mb-2">No matches yet</h3>
-                <p className="text-sm text-slate-400 mb-4">
-                  Add keywords to start monitoring the web
-                </p>
-                <Link href="/dashboard/keywords">
-                  <Button className="bg-emerald-600 hover:bg-emerald-700 text-white">
-                    Add Keywords
-                  </Button>
-                </Link>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                      <div className="text-2xl">
+                        {sourceIcons[match.source] || '🌐'}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge variant="outline" className="text-xs border-slate-700 text-slate-400">
+                            {match.keywords?.keyword}
+                          </Badge>
+                          {match.sentiment && (
+                            <Badge variant="outline" className={`text-xs ${sentimentColors[match.sentiment]}`}>
+                              {match.sentiment}
+                            </Badge>
+                          )}
+                        </div>
+                        <h4 className="font-medium text-white truncate">{match.title}</h4>
+                        <p className="text-sm text-slate-400 line-clamp-2 mt-1">
+                          {match.ai_summary || match.content}
+                        </p>
+                        <div className="flex items-center gap-4 mt-2 text-xs text-slate-500">
+                          <span>{match.source}</span>
+                          <span>{new Date(match.created_at).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                      <a
+                        href={match.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-slate-400 hover:text-white"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <MessageSquare className="h-12 w-12 text-slate-600 mb-4" />
+                  <h3 className="text-lg font-medium text-white mb-2">No matches yet</h3>
+                  <p className="text-sm text-slate-400 mb-4">
+                    Add keywords to start monitoring the web
+                  </p>
+                  <Link href="/dashboard/keywords">
+                    <Button className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                      Add Keywords
+                    </Button>
+                  </Link>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
         <Card className="border-slate-800 bg-slate-900">
           <CardHeader>

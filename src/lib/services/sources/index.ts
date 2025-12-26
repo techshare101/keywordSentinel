@@ -2,9 +2,9 @@ import { searchReddit } from './reddit'
 import { searchHackerNews, searchHNComments } from './hackernews'
 import { searchProductHunt } from './producthunt'
 import { searchGoogleNews } from './googlenews'
-import { 
-  searchWithFirecrawl, 
-  searchRedditWithFirecrawl, 
+import {
+  searchWithFirecrawl,
+  searchRedditWithFirecrawl,
   searchHNWithFirecrawl,
   searchProductHuntWithFirecrawl,
   searchNewsWithFirecrawl,
@@ -24,17 +24,37 @@ export interface SearchResult {
 // Use Firecrawl if API key is available, otherwise fall back to free APIs
 const useFirecrawl = !!process.env.FIRECRAWL_API_KEY
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
 export async function searchAllSources(keyword: string): Promise<SearchResult[]> {
   let results: PromiseSettledResult<SearchResult[]>[]
 
   if (useFirecrawl) {
-    // Enhanced search with Firecrawl
-    results = await Promise.allSettled([
-      searchRedditWithFirecrawl(keyword),
-      searchHNWithFirecrawl(keyword),
-      searchProductHuntWithFirecrawl(keyword),
-      searchNewsWithFirecrawl(keyword),
-    ])
+    // Enhanced search with Firecrawl - Sequential to avoid rate limits
+    const firecrawlSources = [
+      searchRedditWithFirecrawl,
+      searchHNWithFirecrawl,
+      searchProductHuntWithFirecrawl,
+      searchNewsWithFirecrawl,
+    ]
+
+    const resultsArray: SearchResult[] = []
+    for (const searchFn of firecrawlSources) {
+      try {
+        const sourceResults = await searchFn(keyword)
+        resultsArray.push(...sourceResults)
+        // Add 1s delay between sources
+        await sleep(1000)
+      } catch (error) {
+        console.error(`Firecrawl source search failed:`, error)
+      }
+    }
+
+    // Convert to a format compatible with the rest of the function
+    const allResults = resultsArray
+    // Sort by date, newest first
+    allResults.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    return allResults
   } else {
     // Free API fallback
     results = await Promise.allSettled([

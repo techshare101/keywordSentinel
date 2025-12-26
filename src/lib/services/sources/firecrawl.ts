@@ -1,5 +1,12 @@
 import Firecrawl from '@mendable/firecrawl-js'
 
+export class FirecrawlRateLimitError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'FirecrawlRateLimitError'
+  }
+}
+
 function getFirecrawl() {
   return new Firecrawl({
     apiKey: process.env.FIRECRAWL_API_KEY || '',
@@ -60,7 +67,7 @@ export async function searchWithFirecrawl(
     const responseAny = response as any
     console.log(`Firecrawl raw response type: ${typeof responseAny}`)
     console.log(`Firecrawl raw response keys: ${responseAny ? Object.keys(responseAny) : 'null'}`)
-    
+
     // Handle different response formats
     let results: any[] = []
     if (Array.isArray(responseAny)) {
@@ -92,7 +99,11 @@ export async function searchWithFirecrawl(
         ...item.metadata,
       },
     }))
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.status === 429 || error?.message?.includes('Rate limit')) {
+      console.warn('Firecrawl rate limit hit in search')
+      throw new FirecrawlRateLimitError('Firecrawl rate limited')
+    }
     console.error('Firecrawl search error:', error)
     return []
   }
@@ -142,13 +153,13 @@ function detectSource(url: string): FirecrawlSearchResult['source'] {
 function extractAuthor(url: string): string {
   try {
     const urlObj = new URL(url)
-    
+
     // Reddit author extraction
     if (url.includes('reddit.com')) {
       const match = url.match(/\/user\/([^\/]+)/)
       if (match) return match[1]
     }
-    
+
     return urlObj.hostname.replace('www.', '')
   } catch {
     return 'Unknown'
@@ -160,19 +171,19 @@ function extractAuthor(url: string): string {
 // "I need a tool that" -> "need tool" OR "looking for tool"
 function optimizeKeywordForSearch(keyword: string): string {
   const lower = keyword.toLowerCase()
-  
+
   // Extract meaningful tokens (skip common words)
   const stopWords = new Set(['i', 'a', 'an', 'the', 'to', 'for', 'that', 'is', 'are', 'any', 'need', 'want', 'looking'])
   const tokens = lower
     .replace(/[^a-z0-9\s]/g, '')
     .split(/\s+/)
     .filter(t => t.length > 2 && !stopWords.has(t))
-  
+
   // If we have meaningful tokens, use them
   if (tokens.length > 0) {
     return tokens.join(' ')
   }
-  
+
   // Fallback to original
   return keyword
 }
