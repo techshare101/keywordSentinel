@@ -188,21 +188,26 @@ export async function runFullScan(): Promise<{ usersScanned: number; totalMatche
   let keywordsScanned = 0
 
   // Get all users with active keywords
-  const { data: users } = await supabase
+  const { data: users, error: usersError } = await supabase
     .from('users')
     .select('id, scan_interval_minutes, plan')
 
+  console.log(`Found ${users?.length || 0} users, error: ${usersError?.message || 'none'}`)
+
   if (!users?.length) {
+    console.log('No users found in database')
     return { usersScanned: 0, totalMatches: 0, keywordsScanned: 0 }
   }
 
   // Get all active keywords across all users, ordered by last_scanned (oldest first)
-  const { data: allKeywords } = await supabase
+  const { data: allKeywords, error: keywordsError } = await supabase
     .from('keywords')
-    .select('*, users!inner(plan)')
+    .select('*')
     .eq('is_active', true)
     .order('last_scanned', { ascending: true, nullsFirst: true })
     .limit(MAX_KEYWORDS_PER_RUN)
+
+  console.log(`Found ${allKeywords?.length || 0} active keywords, error: ${keywordsError?.message || 'none'}`)
 
   if (!allKeywords?.length) {
     console.log('No active keywords to scan')
