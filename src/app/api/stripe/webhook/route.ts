@@ -57,10 +57,16 @@ export async function POST(request: Request) {
           // Determine plan based on price
           const priceId = subscription.items.data[0]?.price.id
           let plan = 'free'
+          let keywordsLimit = 3
+          let scanInterval = 60
           if (priceId === process.env.STRIPE_PRO_PRICE_ID) {
             plan = 'pro'
+            keywordsLimit = 50
+            scanInterval = 15
           } else if (priceId === process.env.STRIPE_TEAM_PRICE_ID) {
             plan = 'team'
+            keywordsLimit = 200
+            scanInterval = 5
           }
 
           // Update user subscription
@@ -71,6 +77,8 @@ export async function POST(request: Request) {
               stripe_subscription_id: subscription.id,
               subscription_status: subscription.status,
               plan,
+              keywords_limit: keywordsLimit,
+              scan_interval_minutes: scanInterval,
             })
             .eq('id', userId)
         }
@@ -90,10 +98,16 @@ export async function POST(request: Request) {
         if (user) {
           const priceId = subscription.items.data[0]?.price.id
           let plan = 'free'
+          let keywordsLimit = 3
+          let scanInterval = 60
           if (priceId === process.env.STRIPE_PRO_PRICE_ID) {
             plan = 'pro'
+            keywordsLimit = 50
+            scanInterval = 15
           } else if (priceId === process.env.STRIPE_TEAM_PRICE_ID) {
             plan = 'team'
+            keywordsLimit = 200
+            scanInterval = 5
           }
 
           await getSupabaseAdmin()
@@ -101,6 +115,8 @@ export async function POST(request: Request) {
             .update({
               subscription_status: subscription.status,
               plan,
+              keywords_limit: keywordsLimit,
+              scan_interval_minutes: scanInterval,
             })
             .eq('id', user.id)
         }
@@ -124,6 +140,8 @@ export async function POST(request: Request) {
               subscription_status: 'canceled',
               plan: 'free',
               stripe_subscription_id: null,
+              keywords_limit: 3,
+              scan_interval_minutes: 60,
             })
             .eq('id', user.id)
         }

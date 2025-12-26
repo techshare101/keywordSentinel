@@ -321,13 +321,34 @@ export default function SettingsPage() {
                 <h3 className="text-lg font-semibold text-white">{plan.name} Plan</h3>
                 <p className="text-sm text-slate-400">{plan.price}</p>
               </div>
-              {currentPlan !== 'enterprise' && (
-                <Link href="/pricing">
-                  <Button className="bg-emerald-600 hover:bg-emerald-700 text-white">
-                    Upgrade
+              <div className="flex gap-2">
+                {currentPlan !== 'free' && (
+                  <Button 
+                    variant="outline"
+                    className="border-slate-700 text-slate-300 hover:bg-slate-800"
+                    onClick={async () => {
+                      try {
+                        const res = await fetch('/api/stripe/portal', { method: 'POST' })
+                        const data = await res.json()
+                        if (data.url) {
+                          window.location.href = data.url
+                        }
+                      } catch (error) {
+                        console.error('Portal error:', error)
+                      }
+                    }}
+                  >
+                    Manage Subscription
                   </Button>
-                </Link>
-              )}
+                )}
+                {currentPlan === 'free' && (
+                  <Link href="/pricing">
+                    <Button className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                      Upgrade
+                    </Button>
+                  </Link>
+                )}
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>

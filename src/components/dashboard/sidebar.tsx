@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import {
   Radar,
@@ -16,10 +17,12 @@ import {
   BarChart3,
   Flame,
   Activity,
+  Crown,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -37,6 +40,24 @@ export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
+  const [userPlan, setUserPlan] = useState<string>('free')
+
+  useEffect(() => {
+    const fetchUserPlan = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data } = await supabase
+          .from('users')
+          .select('plan')
+          .eq('id', user.id)
+          .single()
+        if (data?.plan) {
+          setUserPlan(data.plan)
+        }
+      }
+    }
+    fetchUserPlan()
+  }, [])
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -75,20 +96,33 @@ export function Sidebar() {
       </nav>
 
       <div className="border-t border-slate-800 p-4">
-        <div className="mb-4 rounded-lg bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Zap className="h-4 w-4 text-emerald-400" />
-            <span className="text-sm font-medium text-white">Upgrade to Pro</span>
+        {userPlan === 'free' ? (
+          <div className="mb-4 rounded-lg bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Zap className="h-4 w-4 text-emerald-400" />
+              <span className="text-sm font-medium text-white">Upgrade to Pro</span>
+            </div>
+            <p className="text-xs text-slate-400 mb-3">
+              Get 50 keywords, 15-min scans, and AI summaries.
+            </p>
+            <Link href="/pricing">
+              <Button size="sm" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white">
+                Upgrade Now
+              </Button>
+            </Link>
           </div>
-          <p className="text-xs text-slate-400 mb-3">
-            Get 50 keywords, 15-min scans, and AI summaries.
-          </p>
-          <Link href="/pricing">
-            <Button size="sm" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white">
-              Upgrade Now
-            </Button>
-          </Link>
-        </div>
+        ) : (
+          <div className="mb-4 rounded-lg bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Crown className="h-4 w-4 text-emerald-400" />
+              <span className="text-sm font-medium text-white capitalize">{userPlan} Plan</span>
+              <Badge className="bg-emerald-500 text-white text-xs">Active</Badge>
+            </div>
+            <p className="text-xs text-slate-400">
+              {userPlan === 'pro' ? '50 keywords, 15-min scans' : '200 keywords, 5-min scans'}
+            </p>
+          </div>
+        )}
 
         <Button
           variant="ghost"

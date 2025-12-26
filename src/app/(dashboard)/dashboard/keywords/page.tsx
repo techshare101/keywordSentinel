@@ -31,6 +31,7 @@ export default function KeywordsPage() {
   const [adding, setAdding] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [keywordLimit, setKeywordLimit] = useState(3)
+  const [userPlan, setUserPlan] = useState<string>('free')
   const supabase = createClient()
 
   useEffect(() => {
@@ -43,11 +44,12 @@ export default function KeywordsPage() {
     if (user) {
       const { data } = await supabase
         .from('users')
-        .select('keywords_limit')
+        .select('keywords_limit, plan')
         .eq('id', user.id)
         .single()
       if (data) {
         setKeywordLimit(data.keywords_limit)
+        setUserPlan(data.plan || 'free')
       }
     }
   }
@@ -313,7 +315,7 @@ export default function KeywordsPage() {
         </CardContent>
       </Card>
 
-      {keywords.length >= keywordLimit && (
+      {keywords.length >= keywordLimit && userPlan === 'free' && (
         <Card className="border-amber-500/20 bg-amber-500/5">
           <CardContent className="flex items-center gap-4 py-4">
             <AlertCircle className="h-5 w-5 text-amber-400" />
