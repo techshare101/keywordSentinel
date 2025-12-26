@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { searchAllSources, type SearchResult } from './sources'
-import { FirecrawlRateLimitError } from './sources/firecrawl'
+import { FirecrawlRateLimitError, FirecrawlCreditsExhaustedError } from './sources/firecrawl'
 import { analyzeMatch } from './ai'
 import { sendEmailAlert, sendSlackAlert, sendDiscordAlert } from './alerts'
 import type { Keyword, UserSettings } from '@/types/database'
@@ -276,6 +276,26 @@ export async function runFullScan(): Promise<{ usersScanned: number; totalMatche
         await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_KEYWORDS_MS))
       }
     } catch (error: any) {
+      if (error instanceof FirecrawlCreditsExhaustedError || error?.status === 402) {
+        console.warn(`Credits exhausted during "${keyword.keyword}", stopping full scan`)
+
+        // Log abort status
+        if (scanRunId) {
+          await supabase
+            .from('scan_runs')
+            .update({
+              aborted: true,
+              error: 'insufficient_credits',
+              finished_at: new Date().toISOString(),
+              keywords_scanned: keywordsScanned,
+              matches_found: totalMatches,
+              duration_ms: Date.now() - startedAt,
+            })
+            .eq('id', scanRunId)
+        }
+        break
+      }
+
       if (error instanceof FirecrawlRateLimitError || error?.status === 429) {
         console.warn(`Rate limited during "${keyword.keyword}", stopping full scan to save quota`)
 

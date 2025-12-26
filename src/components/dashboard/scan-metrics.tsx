@@ -69,11 +69,16 @@ export function ScanMetrics() {
                             Last automated scan: {lastScanDate.toLocaleString()}
                         </CardDescription>
                     </div>
-                    <Badge variant={latest.aborted ? "outline" : "default"} className={latest.aborted ? "text-yellow-600 border-yellow-200 bg-yellow-50" : "bg-green-500 hover:bg-green-600"}>
+                    <Badge
+                        variant={latest.aborted ? "outline" : "default"}
+                        className={latest.aborted
+                            ? (latest.error === 'insufficient_credits' ? "text-red-600 border-red-200 bg-red-50" : "text-yellow-600 border-yellow-200 bg-yellow-50")
+                            : "bg-green-500 hover:bg-green-600"}
+                    >
                         {latest.aborted ? (
                             <span className="flex items-center gap-1">
                                 <AlertCircle className="h-3 w-3" />
-                                Aborted (Rate Limited)
+                                {latest.error === 'insufficient_credits' ? 'Aborted (No Credits)' : 'Aborted (Rate Limited)'}
                             </span>
                         ) : (
                             <span className="flex items-center gap-1">
@@ -112,7 +117,12 @@ export function ScanMetrics() {
                                 <div className="flex items-center gap-4">
                                     <span className="font-medium">{run.keywords_scanned} keywords / {run.matches_found} matches</span>
                                     {run.aborted ? (
-                                        <Badge variant="outline" className="h-5 px-1.5 text-[10px] text-yellow-600 border-yellow-200">Rate Ltd</Badge>
+                                        <Badge
+                                            variant="outline"
+                                            className={`h-5 px-1.5 text-[10px] ${run.error === 'insufficient_credits' ? 'text-red-600 border-red-200' : 'text-yellow-600 border-yellow-200'}`}
+                                        >
+                                            {run.error === 'insufficient_credits' ? 'No Credits' : 'Rate Ltd'}
+                                        </Badge>
                                     ) : (
                                         <Badge variant="outline" className="h-5 px-1.5 text-[10px] text-green-600 border-green-200">OK</Badge>
                                     )}
