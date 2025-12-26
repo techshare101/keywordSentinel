@@ -1,6 +1,7 @@
 'use client'
 
 import { Search } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -24,6 +25,7 @@ interface HeaderProps {
 }
 
 export function Header({ user }: HeaderProps) {
+  const router = useRouter()
   const initials = user.full_name
     ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase()
     : user.email[0].toUpperCase()
@@ -63,13 +65,22 @@ export function Header({ user }: HeaderProps) {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator className="bg-slate-700" />
-            <DropdownMenuItem className="text-slate-300 focus:bg-slate-700 focus:text-white cursor-pointer">
+            <DropdownMenuItem 
+              className="text-slate-300 focus:bg-slate-700 focus:text-white cursor-pointer"
+              onClick={() => router.push('/dashboard/settings')}
+            >
               Profile
             </DropdownMenuItem>
-            <DropdownMenuItem className="text-slate-300 focus:bg-slate-700 focus:text-white cursor-pointer">
+            <DropdownMenuItem 
+              className="text-slate-300 focus:bg-slate-700 focus:text-white cursor-pointer"
+              onClick={() => router.push('/dashboard/settings')}
+            >
               Billing
             </DropdownMenuItem>
-            <DropdownMenuItem className="text-slate-300 focus:bg-slate-700 focus:text-white cursor-pointer">
+            <DropdownMenuItem 
+              className="text-slate-300 focus:bg-slate-700 focus:text-white cursor-pointer"
+              onClick={() => router.push('/dashboard/settings')}
+            >
               Settings
             </DropdownMenuItem>
           </DropdownMenuContent>
