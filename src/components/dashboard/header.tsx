@@ -67,19 +67,19 @@ export function Header({ user }: HeaderProps) {
             <DropdownMenuSeparator className="bg-slate-700" />
             <DropdownMenuItem 
               className="text-slate-300 focus:bg-slate-700 focus:text-white cursor-pointer"
-              onClick={() => router.push('/dashboard/settings')}
+              onSelect={() => router.push('/dashboard/settings')}
             >
               Profile
             </DropdownMenuItem>
             <DropdownMenuItem 
               className="text-slate-300 focus:bg-slate-700 focus:text-white cursor-pointer"
-              onClick={() => router.push('/dashboard/settings')}
+              onSelect={() => router.push('/dashboard/settings')}
             >
               Billing
             </DropdownMenuItem>
             <DropdownMenuItem 
               className="text-slate-300 focus:bg-slate-700 focus:text-white cursor-pointer"
-              onClick={() => router.push('/dashboard/settings')}
+              onSelect={() => router.push('/dashboard/settings')}
             >
               Settings
             </DropdownMenuItem>
