@@ -210,12 +210,12 @@ export async function runFullScan(): Promise<{ usersScanned: number; totalMatche
     return { usersScanned: 0, totalMatches: 0, keywordsScanned: 0 }
   }
 
-  // Get all active keywords across all users, ordered by last_scanned (oldest first)
+  // Get all active keywords across all users
   const { data: allKeywords, error: keywordsError } = await supabase
     .from('keywords')
     .select('*')
     .eq('is_active', true)
-    .order('last_scanned', { ascending: true, nullsFirst: true })
+    .order('created_at', { ascending: true })
     .limit(MAX_KEYWORDS_PER_RUN)
 
   console.log(`Found ${allKeywords?.length || 0} active keywords, error: ${keywordsError?.message || 'none'}`)
