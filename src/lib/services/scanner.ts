@@ -87,7 +87,7 @@ async function scanKeyword(
     console.log(`Scanning keyword: "${keyword.keyword}" (Plan: ${plan})`)
     const searchResults = await searchAllSources(keyword.keyword, plan)
 
-    console.log(`Firecrawl returned ${searchResults.length} results for "${keyword.keyword}"`)
+    console.log(`Search returned ${searchResults.length} results for "${keyword.keyword}"`)
 
     if (searchResults.length === 0) {
       return result
