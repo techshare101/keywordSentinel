@@ -1,8 +1,10 @@
 import Firecrawl from '@mendable/firecrawl-js'
 
-const firecrawl = new Firecrawl({
-  apiKey: process.env.FIRECRAWL_API_KEY || '',
-})
+function getFirecrawl() {
+  return new Firecrawl({
+    apiKey: process.env.FIRECRAWL_API_KEY || '',
+  })
+}
 
 interface FirecrawlSearchResult {
   title: string
@@ -20,7 +22,7 @@ export async function scrapeUrl(url: string): Promise<{
   metadata: Record<string, any>
 } | null> {
   try {
-    const result = await firecrawl.scrape(url, {
+    const result = await getFirecrawl().scrape(url, {
       formats: ['markdown'],
     })
 
@@ -46,7 +48,7 @@ export async function searchWithFirecrawl(
   }
 ): Promise<FirecrawlSearchResult[]> {
   try {
-    const results = await firecrawl.search(query, {
+    const results = await getFirecrawl().search(query, {
       limit: options?.limit || 10,
       scrapeOptions: {
         formats: ['markdown'],
@@ -84,7 +86,7 @@ export async function crawlWebsite(
   }
 ): Promise<Array<{ url: string; title: string; content: string }>> {
   try {
-    const result = await firecrawl.crawl(url, {
+    const result = await getFirecrawl().crawl(url, {
       limit: options?.maxPages || 10,
       includePaths: options?.includePaths,
       excludePaths: options?.excludePaths,
