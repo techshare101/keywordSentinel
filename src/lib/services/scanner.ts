@@ -70,7 +70,10 @@ async function scanKeyword(
 
   try {
     // Search all sources for this keyword
+    console.log(`Scanning keyword: "${keyword.keyword}"`)
     const searchResults = await searchAllSources(keyword.keyword)
+    
+    console.log(`Firecrawl returned ${searchResults.length} results for "${keyword.keyword}"`)
     
     if (searchResults.length === 0) {
       return result
@@ -84,6 +87,8 @@ async function scanKeyword(
 
     const existingUrls = new Set(existingMatches?.map((m) => m.url) || [])
     const newResults = searchResults.filter((r) => !existingUrls.has(r.url))
+
+    console.log(`New results after filtering existing: ${newResults.length}`)
 
     if (newResults.length === 0) {
       return result

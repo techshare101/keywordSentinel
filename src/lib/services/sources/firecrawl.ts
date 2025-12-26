@@ -134,18 +134,48 @@ function extractAuthor(url: string): string {
   }
 }
 
+// Convert phrase keywords to better search queries
+// "any alternative to" -> alternative OR alternatives
+// "I need a tool that" -> "need tool" OR "looking for tool"
+function optimizeKeywordForSearch(keyword: string): string {
+  const lower = keyword.toLowerCase()
+  
+  // Extract meaningful tokens (skip common words)
+  const stopWords = new Set(['i', 'a', 'an', 'the', 'to', 'for', 'that', 'is', 'are', 'any', 'need', 'want', 'looking'])
+  const tokens = lower
+    .replace(/[^a-z0-9\s]/g, '')
+    .split(/\s+/)
+    .filter(t => t.length > 2 && !stopWords.has(t))
+  
+  // If we have meaningful tokens, use them
+  if (tokens.length > 0) {
+    return tokens.join(' ')
+  }
+  
+  // Fallback to original
+  return keyword
+}
+
 export async function searchRedditWithFirecrawl(keyword: string): Promise<FirecrawlSearchResult[]> {
-  return searchWithFirecrawl(`site:reddit.com ${keyword}`, { limit: 15 })
+  const optimized = optimizeKeywordForSearch(keyword)
+  console.log(`Reddit search: "${keyword}" -> "${optimized}"`)
+  return searchWithFirecrawl(`site:reddit.com ${optimized}`, { limit: 15 })
 }
 
 export async function searchHNWithFirecrawl(keyword: string): Promise<FirecrawlSearchResult[]> {
-  return searchWithFirecrawl(`site:news.ycombinator.com ${keyword}`, { limit: 15 })
+  const optimized = optimizeKeywordForSearch(keyword)
+  console.log(`HN search: "${keyword}" -> "${optimized}"`)
+  return searchWithFirecrawl(`site:news.ycombinator.com ${optimized}`, { limit: 15 })
 }
 
 export async function searchProductHuntWithFirecrawl(keyword: string): Promise<FirecrawlSearchResult[]> {
-  return searchWithFirecrawl(`site:producthunt.com ${keyword}`, { limit: 10 })
+  const optimized = optimizeKeywordForSearch(keyword)
+  console.log(`ProductHunt search: "${keyword}" -> "${optimized}"`)
+  return searchWithFirecrawl(`site:producthunt.com ${optimized}`, { limit: 10 })
 }
 
 export async function searchNewsWithFirecrawl(keyword: string): Promise<FirecrawlSearchResult[]> {
-  return searchWithFirecrawl(keyword, { limit: 15 })
+  const optimized = optimizeKeywordForSearch(keyword)
+  console.log(`News search: "${keyword}" -> "${optimized}"`)
+  return searchWithFirecrawl(optimized, { limit: 15 })
 }
