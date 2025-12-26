@@ -5,10 +5,21 @@ import { sendEmailAlert, sendSlackAlert, sendDiscordAlert } from './alerts'
 import type { Keyword, UserSettings } from '@/types/database'
 
 // Create admin client for server-side operations
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getSupabaseAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  
+  console.log(`Supabase URL exists: ${!!url}`)
+  console.log(`Supabase Service Role Key exists: ${!!key}`)
+  
+  if (!url || !key) {
+    throw new Error(`Missing Supabase env vars: URL=${!!url}, KEY=${!!key}`)
+  }
+  
+  return createClient(url, key)
+}
+
+const supabase = getSupabaseAdmin()
 
 interface ScanResult {
   userId: string
