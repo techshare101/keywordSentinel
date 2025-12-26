@@ -48,20 +48,28 @@ export async function scrapeUrl(url: string): Promise<{
   }
 }
 
+async function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
 export async function searchWithFirecrawl(
   query: string,
   options?: {
     limit?: number
   }
 ): Promise<FirecrawlSearchResult[]> {
-  try {
-    console.log(`Firecrawl searching for: "${query}"`)
-    const response = await getFirecrawl().search(query, {
-      limit: options?.limit || 10,
-      scrapeOptions: {
-        formats: ['markdown'],
-      },
-    })
+  const MAX_RETRIES = 2
+  let lastError: any
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      console.log(`Firecrawl searching for: "${query}"${attempt > 0 ? ` (retry ${attempt})` : ''}`)
+      const response = await getFirecrawl().search(query, {
+        limit: options?.limit || 10,
+        scrapeOptions: {
+          formats: ['markdown'],
+        },
+      })
 
     // Debug: log raw response structure
     const responseAny = response as any
@@ -87,26 +95,45 @@ export async function searchWithFirecrawl(
       return []
     }
 
-    return results.map((item: any) => ({
-      title: item.title || 'Untitled',
-      content: item.markdown || item.description || item.content || '',
-      url: item.url,
-      author: extractAuthor(item.url),
-      source: detectSource(item.url),
-      createdAt: new Date(),
-      metadata: {
-        description: item.description,
-        ...item.metadata,
-      },
-    }))
-  } catch (error: any) {
-    if (error?.status === 429 || error?.message?.includes('Rate limit')) {
-      console.warn('Firecrawl rate limit hit in search')
-      throw new FirecrawlRateLimitError('Firecrawl rate limited')
+      return results.map((item: any) => ({
+        title: item.title || 'Untitled',
+        content: item.markdown || item.description || item.content || '',
+        url: item.url,
+        author: extractAuthor(item.url),
+        source: detectSource(item.url),
+        createdAt: new Date(),
+        metadata: {
+          description: item.description,
+          ...item.metadata,
+        },
+      }))
+    } catch (error: any) {
+      lastError = error
+      
+      if (error?.status === 429 || error?.message?.includes('Rate limit')) {
+        console.warn(`Firecrawl rate limit hit in search (attempt ${attempt + 1}/${MAX_RETRIES + 1})`)
+        
+        // On last attempt, throw to abort scan
+        if (attempt === MAX_RETRIES) {
+          throw new FirecrawlRateLimitError('Firecrawl rate limited after retries')
+        }
+        
+        // Exponential backoff: 10s, 20s
+        const backoffMs = 10000 * Math.pow(2, attempt)
+        console.log(`Waiting ${backoffMs}ms before retry...`)
+        await sleep(backoffMs)
+        continue // Retry
+      }
+      
+      // Non-rate-limit error, log and return empty
+      console.error('Firecrawl search error:', error)
+      return []
     }
-    console.error('Firecrawl search error:', error)
-    return []
   }
+  
+  // If we exhausted retries
+  console.error('Firecrawl search failed after retries:', lastError)
+  return []
 }
 
 export async function crawlWebsite(
@@ -191,23 +218,23 @@ function optimizeKeywordForSearch(keyword: string): string {
 export async function searchRedditWithFirecrawl(keyword: string): Promise<FirecrawlSearchResult[]> {
   const optimized = optimizeKeywordForSearch(keyword)
   console.log(`Reddit search: "${keyword}" -> "${optimized}"`)
-  return searchWithFirecrawl(`site:reddit.com ${optimized}`, { limit: 15 })
+  return searchWithFirecrawl(`site:reddit.com ${optimized}`, { limit: 5 }) // Reduced from 15
 }
 
 export async function searchHNWithFirecrawl(keyword: string): Promise<FirecrawlSearchResult[]> {
   const optimized = optimizeKeywordForSearch(keyword)
   console.log(`HN search: "${keyword}" -> "${optimized}"`)
-  return searchWithFirecrawl(`site:news.ycombinator.com ${optimized}`, { limit: 15 })
+  return searchWithFirecrawl(`site:news.ycombinator.com ${optimized}`, { limit: 5 }) // Reduced from 15
 }
 
 export async function searchProductHuntWithFirecrawl(keyword: string): Promise<FirecrawlSearchResult[]> {
   const optimized = optimizeKeywordForSearch(keyword)
   console.log(`ProductHunt search: "${keyword}" -> "${optimized}"`)
-  return searchWithFirecrawl(`site:producthunt.com ${optimized}`, { limit: 10 })
+  return searchWithFirecrawl(`site:producthunt.com ${optimized}`, { limit: 3 }) // Reduced from 10
 }
 
 export async function searchNewsWithFirecrawl(keyword: string): Promise<FirecrawlSearchResult[]> {
   const optimized = optimizeKeywordForSearch(keyword)
   console.log(`News search: "${keyword}" -> "${optimized}"`)
-  return searchWithFirecrawl(optimized, { limit: 15 })
+  return searchWithFirecrawl(optimized, { limit: 5 }) // Reduced from 15
 }

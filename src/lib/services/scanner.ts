@@ -191,8 +191,10 @@ async function recordAlerts(
 }
 
 // Rate limiting: max keywords to scan per cron run to avoid Firecrawl limits
-const MAX_KEYWORDS_PER_RUN = 3
-const DELAY_BETWEEN_KEYWORDS_MS = 5000 // 5 second delay between keywords
+// Firecrawl free tier: 20 req/min = 1 request every 3 seconds
+// Each keyword hits 4 sources (Reddit, HN, PH, News)
+const MAX_KEYWORDS_PER_RUN = 2 // Reduced from 3 to be safe
+const DELAY_BETWEEN_KEYWORDS_MS = 15000 // 15 seconds between keywords (was 5s)
 
 export async function runFullScan(): Promise<{ usersScanned: number; totalMatches: number; keywordsScanned: number }> {
   const startedAt = Date.now()

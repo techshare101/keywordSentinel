@@ -44,8 +44,8 @@ export async function searchAllSources(keyword: string): Promise<SearchResult[]>
       try {
         const sourceResults = await searchFn(keyword)
         resultsArray.push(...sourceResults)
-        // Add 2s delay between sources for extra safety
-        await sleep(2000)
+        // Add 4s delay between sources (20 req/min = 1 req per 3s minimum)
+        await sleep(4000)
       } catch (error) {
         if (error instanceof FirecrawlRateLimitError) {
           throw error // Propagate to trigger scanner abort
