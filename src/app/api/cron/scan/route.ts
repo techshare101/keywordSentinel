@@ -5,10 +5,16 @@ export const dynamic = 'force-dynamic'
 
 export async function GET(req: Request) {
   // Verify the request is from Vercel Cron
-  const authHeader = req.headers.get('authorization')
+  const authHeader = req.headers.get('authorization') || req.headers.get('Authorization')
   
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return new NextResponse('Unauthorized', { status: 401 })
+  if (!authHeader) {
+    return new NextResponse('Missing auth header', { status: 401 })
+  }
+
+  const token = authHeader.replace('Bearer ', '')
+  
+  if (token !== process.env.CRON_SECRET) {
+    return new NextResponse('Invalid cron secret', { status: 401 })
   }
 
   try {
