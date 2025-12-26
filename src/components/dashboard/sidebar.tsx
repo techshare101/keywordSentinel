@@ -83,9 +83,11 @@ export function Sidebar() {
           <p className="text-xs text-slate-400 mb-3">
             Get 50 keywords, 15-min scans, and AI summaries.
           </p>
-          <Button size="sm" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white">
-            Upgrade Now
-          </Button>
+          <Link href="/pricing">
+            <Button size="sm" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white">
+              Upgrade Now
+            </Button>
+          </Link>
         </div>
 
         <Button

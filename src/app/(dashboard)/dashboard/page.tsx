@@ -257,9 +257,11 @@ export default async function DashboardPage() {
                   Get 50 keywords and 15-minute scans
                 </p>
               </div>
-              <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white">
-                Upgrade
-              </Button>
+              <Link href="/pricing">
+                <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                  Upgrade
+                </Button>
+              </Link>
             </div>
           </CardContent>
         </Card>

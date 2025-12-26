@@ -19,6 +19,7 @@ import {
 import { Label } from '@/components/ui/label'
 import { Plus, Search, Trash2, Loader2, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
+import Link from 'next/link'
 import type { Keyword } from '@/types/database'
 import { KeywordSuggestions } from '@/components/dashboard/keyword-suggestions'
 import { BulkImport } from '@/components/dashboard/bulk-import'
@@ -326,9 +327,11 @@ export default function KeywordsPage() {
                 Upgrade to Pro for 50 keywords and faster scan intervals.
               </p>
             </div>
-            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white">
-              Upgrade to Pro
-            </Button>
+            <Link href="/pricing">
+              <Button className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                Upgrade to Pro
+              </Button>
+            </Link>
           </CardContent>
         </Card>
       )}

@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
+import Link from 'next/link'
 import {
   Select,
   SelectContent,
@@ -321,9 +322,11 @@ export default function SettingsPage() {
                 <p className="text-sm text-slate-400">{plan.price}</p>
               </div>
               {currentPlan !== 'enterprise' && (
-                <Button className="bg-emerald-600 hover:bg-emerald-700 text-white">
-                  Upgrade
-                </Button>
+                <Link href="/pricing">
+                  <Button className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                    Upgrade
+                  </Button>
+                </Link>
               )}
             </div>
             <div className="grid grid-cols-2 gap-4 text-sm">
