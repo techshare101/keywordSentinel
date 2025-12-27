@@ -10,9 +10,6 @@ function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-  console.log(`Supabase URL exists: ${!!url}`)
-  console.log(`Supabase Service Role Key exists: ${!!key}`)
-
   if (!url || !key) {
     throw new Error(`Missing Supabase env vars: URL=${!!url}, KEY=${!!key}`)
   }
@@ -31,7 +28,15 @@ interface ScanResult {
 }
 
 export async function scanKeywordsForUser(userId: string): Promise<ScanResult[]> {
+  const startedAt = Date.now()
   const results: ScanResult[] = []
+
+  // Create scan_runs entry for this user
+  const { data: scanRun } = await supabase
+    .from('scan_runs')
+    .insert({ user_id: userId })
+    .select()
+    .single()
 
   // Get user's active keywords
   const { data: keywords, error: keywordsError } = await supabase
@@ -41,7 +46,14 @@ export async function scanKeywordsForUser(userId: string): Promise<ScanResult[]>
     .eq('is_active', true)
 
   if (keywordsError || !keywords?.length) {
-    console.log(`No active keywords for user ${userId}`)
+    if (scanRun) {
+      await supabase.from('scan_runs').update({
+        finished_at: new Date().toISOString(),
+        keywords_scanned: 0,
+        matches_found: 0,
+        duration_ms: Date.now() - startedAt
+      }).eq('id', scanRun.id)
+    }
     return results
   }
 
@@ -62,9 +74,25 @@ export async function scanKeywordsForUser(userId: string): Promise<ScanResult[]>
     .eq('user_id', userId)
     .single()
 
+  let totalMatches = 0
   for (const keyword of keywords) {
-    const result = await scanKeyword(keyword, settings, userEmail, userPlan)
-    results.push(result)
+    try {
+      const result = await scanKeyword(keyword, settings, userEmail, userPlan)
+      results.push(result)
+      totalMatches += result.matchesFound
+    } catch (err) {
+      console.error(`Error scanning keyword ${keyword.keyword}:`, err)
+    }
+  }
+
+  // Finalize scan run
+  if (scanRun) {
+    await supabase.from('scan_runs').update({
+      finished_at: new Date().toISOString(),
+      keywords_scanned: keywords.length,
+      matches_found: totalMatches,
+      duration_ms: Date.now() - startedAt
+    }).eq('id', scanRun.id)
   }
 
   return results
@@ -89,8 +117,6 @@ async function scanKeyword(
     console.log(`Scanning keyword: "${keyword.keyword}" (Plan: ${plan})`)
     const searchResults = await searchAllSources(keyword.keyword, plan)
 
-    console.log(`Search returned ${searchResults.length} results for "${keyword.keyword}"`)
-
     if (searchResults.length === 0) {
       return result
     }
@@ -104,40 +130,28 @@ async function scanKeyword(
     const existingUrls = new Set(existingMatches?.map((m) => m.url) || [])
     const newResults = searchResults.filter((r) => !existingUrls.has(r.url))
 
-    console.log(`New results after filtering existing: ${newResults.length}`)
-
     if (newResults.length === 0) {
       return result
     }
 
-    // Filter out duplicates within the current search results themselves
+    // Filter out duplicates within the current search results
     const uniqueSearchResults = Array.from(
       new Map(newResults.map(item => [item.url, item])).values()
     )
-
-    console.log(`Unique search results to process: ${uniqueSearchResults.length}`)
 
     // Analyze and store new matches
     const newMatches = []
     const toInsert: any[] = []
 
-    console.log(`Analyzing ${uniqueSearchResults.length} unique results for "${keyword.keyword}"`)
-
     for (const searchResult of uniqueSearchResults.slice(0, 10)) {
       try {
-        console.log(`Analyzing result: ${searchResult.url} from ${searchResult.source}`)
-        // OpenRouter Discovery Analysis (Cheap Model)
         const discovery = await analyzeLeadDiscovery(
           searchResult.title,
           searchResult.content,
           keyword.keyword
         )
 
-        // Apply 40/70 thresholds
-        if (discovery.score < 40) {
-          console.log(`[Scanner] Discarding lead with low score (${discovery.score}): ${searchResult.url}`)
-          continue
-        }
+        if (discovery.score < 40) continue
 
         const bucket = discovery.score >= 70 ? 'hot' : 'warm'
 
@@ -160,23 +174,18 @@ async function scanKeyword(
         }
 
         toInsert.push(matchData)
-        console.log(`[Scanner] ${bucket.toUpperCase()} lead found (${discovery.score}): ${searchResult.title.slice(0, 30)}...`)
       } catch (err) {
         console.error(`Error analyzing search result ${searchResult.url}:`, err)
       }
     }
 
     if (toInsert.length > 0) {
-      console.log(`Attempting to insert ${toInsert.length} matches for "${keyword.keyword}"`)
       const { data: insertedData, error: insertError } = await supabase
         .from('matches')
         .insert(toInsert)
         .select('*, keywords(keyword)')
 
-      if (insertError) {
-        console.error(`Failed to insert matches for "${keyword.keyword}":`, insertError)
-      } else if (insertedData) {
-        console.log(`Successfully inserted ${insertedData.length} matches for "${keyword.keyword}"`)
+      if (!insertError && insertedData) {
         newMatches.push(...insertedData)
         result.matchesFound = insertedData.length
       }
@@ -184,31 +193,22 @@ async function scanKeyword(
 
     // Send alerts if enabled
     if (newMatches.length > 0 && settings) {
-      // Email alerts
       if (settings.email_alerts && userEmail) {
         const sent = await sendEmailAlert(userEmail, newMatches)
-        if (sent) {
-          await recordAlerts(newMatches, keyword.user_id, 'email', sent)
-          result.alertsSent++
-        }
+        if (sent) await recordAlerts(newMatches, keyword.user_id, 'email', sent)
+        result.alertsSent++
       }
 
-      // Slack alerts
       if (settings.slack_webhook) {
         const sent = await sendSlackAlert(settings.slack_webhook, newMatches)
-        if (sent) {
-          await recordAlerts(newMatches, keyword.user_id, 'slack', sent)
-          result.alertsSent++
-        }
+        if (sent) await recordAlerts(newMatches, keyword.user_id, 'slack', sent)
+        result.alertsSent++
       }
 
-      // Discord alerts
       if (settings.discord_webhook) {
         const sent = await sendDiscordAlert(settings.discord_webhook, newMatches)
-        if (sent) {
-          await recordAlerts(newMatches, keyword.user_id, 'discord', sent)
-          result.alertsSent++
-        }
+        if (sent) await recordAlerts(newMatches, keyword.user_id, 'discord', sent)
+        result.alertsSent++
       }
     }
   } catch (error) {
@@ -234,70 +234,43 @@ async function recordAlerts(
   await supabase.from('alerts').insert(alerts)
 }
 
-// Rate limiting: max keywords to scan per cron run to avoid Firecrawl limits
-// Firecrawl free tier: 20 req/min = 1 request every 3 seconds
-// Each keyword hits 4 sources (Reddit, HN, PH, News)
-const MAX_KEYWORDS_PER_RUN = 2 // Reduced from 3 to be safe
-const DELAY_BETWEEN_KEYWORDS_MS = 15000 // 15 seconds between keywords (was 5s)
+const MAX_KEYWORDS_PER_RUN = 2
+const DELAY_BETWEEN_KEYWORDS_MS = 15000
 
 export async function runFullScan(): Promise<{ usersScanned: number; totalMatches: number; keywordsScanned: number }> {
-  const startedAt = Date.now()
   let usersScanned = 0
   let totalMatches = 0
   let keywordsScanned = 0
 
-  // Register scan run
-  const { data: scanRun, error: scanRunError } = await supabase
-    .from('scan_runs')
-    .insert({})
-    .select()
-    .single()
+  const { data: users } = await supabase.from('users').select('id, plan')
+  if (!users?.length) return { usersScanned: 0, totalMatches: 0, keywordsScanned: 0 }
 
-  if (scanRunError) {
-    console.error('Failed to create scan run entry:', scanRunError)
-  }
-
-  const scanRunId = scanRun?.id
-
-  // Get all users with active keywords
-  const { data: users, error: usersError } = await supabase
-    .from('users')
-    .select('id, scan_interval_minutes, plan')
-
-  console.log(`Found ${users?.length || 0} users, error: ${usersError?.message || 'none'}`)
-
-  if (!users?.length) {
-    console.log('No users found in database')
-    return { usersScanned: 0, totalMatches: 0, keywordsScanned: 0 }
-  }
-
-  // Get all active keywords across all users
-  const { data: allKeywords, error: keywordsError } = await supabase
+  const { data: allKeywords } = await supabase
     .from('keywords')
     .select('*')
     .eq('is_active', true)
     .order('last_scanned', { ascending: true, nullsFirst: true })
     .limit(MAX_KEYWORDS_PER_RUN)
 
-  console.log(`Found ${allKeywords?.length || 0} active keywords, error: ${keywordsError?.message || 'none'}`)
-
-  if (!allKeywords?.length) {
-    console.log('No active keywords to scan')
-    return { usersScanned: 0, totalMatches: 0, keywordsScanned: 0 }
-  }
+  if (!allKeywords?.length) return { usersScanned: 0, totalMatches: 0, keywordsScanned: 0 }
 
   const userIds = new Set<string>()
 
   for (const keyword of allKeywords) {
+    const startedAt = Date.now()
     try {
-      // Get user settings
+      const { data: scanRun } = await supabase
+        .from('scan_runs')
+        .insert({ user_id: keyword.user_id })
+        .select()
+        .single()
+
       const { data: settings } = await supabase
         .from('user_settings')
         .select('*')
         .eq('user_id', keyword.user_id)
         .single()
 
-      // Get user email
       const { data: user } = await supabase
         .from('users')
         .select('email')
@@ -306,80 +279,33 @@ export async function runFullScan(): Promise<{ usersScanned: number; totalMatche
 
       const userPlan = users?.find(u => u.id === keyword.user_id)?.plan || 'free'
       const result = await scanKeyword(keyword, settings, user?.email, userPlan)
+
       totalMatches += result.matchesFound
       keywordsScanned++
       userIds.add(keyword.user_id)
 
-      // Update last_scanned timestamp AFTER processing
       await supabase
         .from('keywords')
         .update({ last_scanned: new Date().toISOString() })
         .eq('id', keyword.id)
 
-      // Delay between keywords to respect rate limits
-      // Pro/Team get faster processing if we had concurrency, 
-      // but for now they just get priority in the queue.
+      if (scanRun) {
+        await supabase.from('scan_runs').update({
+          finished_at: new Date().toISOString(),
+          keywords_scanned: 1,
+          matches_found: result.matchesFound,
+          duration_ms: Date.now() - startedAt
+        }).eq('id', scanRun.id)
+      }
+
       if (keywordsScanned < allKeywords.length) {
         await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_KEYWORDS_MS))
       }
     } catch (error: any) {
-      if (error instanceof FirecrawlCreditsExhaustedError || error?.status === 402) {
-        console.warn(`Credits exhausted during "${keyword.keyword}", stopping full scan`)
-
-        // Log abort status
-        if (scanRunId) {
-          await supabase
-            .from('scan_runs')
-            .update({
-              aborted: true,
-              error: 'insufficient_credits',
-              finished_at: new Date().toISOString(),
-              keywords_scanned: keywordsScanned,
-              matches_found: totalMatches,
-              duration_ms: Date.now() - startedAt,
-            })
-            .eq('id', scanRunId)
-        }
-        break
-      }
-
-      if (error instanceof FirecrawlRateLimitError || error?.status === 429) {
-        console.warn(`Rate limited during "${keyword.keyword}", stopping full scan to save quota`)
-
-        // Log abort status
-        if (scanRunId) {
-          await supabase
-            .from('scan_runs')
-            .update({
-              aborted: true,
-              error: 'rate_limited',
-              finished_at: new Date().toISOString(),
-              keywords_scanned: keywordsScanned,
-              matches_found: totalMatches,
-              duration_ms: Date.now() - startedAt,
-            })
-            .eq('id', scanRunId)
-        }
-        break
-      }
       console.error(`Error scanning keyword "${keyword.keyword}":`, error)
     }
   }
 
   usersScanned = userIds.size
-
-  // Log successful completion
-  if (scanRunId) {
-    await supabase
-      .from('scan_runs')
-      .update({
-        finished_at: new Date().toISOString(),
-        keywords_scanned: keywordsScanned,
-        matches_found: totalMatches,
-        duration_ms: Date.now() - startedAt,
-      })
-      .eq('id', scanRunId)
-  }
-
   return { usersScanned, totalMatches, keywordsScanned }
 }
