@@ -57,8 +57,8 @@ export function ScanMetrics() {
     const lastScanDate = new Date(latest.started_at)
 
     return (
-        <Card className="overflow-hidden">
-            <CardHeader className="pb-3 border-b bg-muted/30">
+        <Card className="overflow-hidden border-slate-800 bg-slate-900">
+            <CardHeader className="pb-3 border-b border-slate-800 bg-slate-800/20">
                 <div className="flex items-center justify-between">
                     <div className="space-y-1">
                         <CardTitle className="text-sm font-medium flex items-center gap-2">

@@ -29,11 +29,31 @@ const useFirecrawl = !!process.env.FIRECRAWL_API_KEY
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 export async function searchAllSources(keyword: string, plan: string = 'free'): Promise<SearchResult[]> {
-  let results: PromiseSettledResult<SearchResult[]>[] = []
-  let useFallback = !useFirecrawl || plan === 'free'
+  const allResultsMap = new Map<string, SearchResult>()
 
+  // 1. Always run Free/Fallback APIs (Real-time & Reliable)
+  console.log(`[Search] Running fallback apps for: "${keyword}"`)
+  const fallbackSettled = await Promise.allSettled([
+    searchReddit(keyword),
+    searchHackerNews(keyword),
+    searchHNComments(keyword),
+    searchGoogleNews(keyword),
+    searchProductHunt(keyword),
+  ])
+
+  for (const result of fallbackSettled) {
+    if (result.status === 'fulfilled') {
+      result.value.forEach(r => {
+        if (!allResultsMap.has(r.url)) {
+          allResultsMap.set(r.url, r)
+        }
+      })
+    }
+  }
+
+  // 2. Enhanced search with Firecrawl for Pro/Team users (Deep Search)
   if (useFirecrawl && plan !== 'free') {
-    // Enhanced search with Firecrawl - Sequential to avoid rate limits
+    console.log(`[Search] Running Firecrawl deep search for: "${keyword}" (Plan: ${plan})`)
     const firecrawlSources = [
       searchRedditWithFirecrawl,
       searchHNWithFirecrawl,
@@ -41,59 +61,37 @@ export async function searchAllSources(keyword: string, plan: string = 'free'): 
       searchNewsWithFirecrawl,
     ]
 
-    const resultsArray: SearchResult[] = []
     for (const searchFn of firecrawlSources) {
       try {
         const sourceResults = await searchFn(keyword)
-        resultsArray.push(...sourceResults)
-        // Add 4s delay between sources (20 req/min = 1 req per 3s minimum)
+        sourceResults.forEach(r => {
+          // Firecrawl results are often richer, so we can overwrite or just add if new
+          if (!allResultsMap.has(r.url)) {
+            allResultsMap.set(r.url, r)
+          }
+        })
+        // Add delay between sources to respect rate limits
         await sleep(4000)
       } catch (error) {
         if (error instanceof FirecrawlCreditsExhaustedError) {
-          console.warn('Firecrawl credits exhausted, falling back to free APIs')
-          useFallback = true
-          break // Exit loop and use free APIs
+          console.warn('Firecrawl credits exhausted.')
+          break
         }
         if (error instanceof FirecrawlRateLimitError) {
-          throw error // Propagate to trigger scanner abort
+          console.warn('Firecrawl rate limited.')
+          break
         }
         console.error(`Firecrawl source search failed:`, error)
       }
     }
-
-    // If we got results from Firecrawl and didn't hit credits issue, return them
-    if (!useFallback) {
-      const allResults = resultsArray
-      // Sort by date, newest first
-      allResults.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-      return allResults
-    }
   }
 
-  // Free API fallback (used if Firecrawl not configured, credits exhausted, or disabled)
-  if (useFallback) {
-    console.log('Using free APIs for search')
-    results = await Promise.allSettled([
-      searchReddit(keyword),
-      searchHackerNews(keyword),
-      searchHNComments(keyword),
-      searchGoogleNews(keyword),
-      searchProductHunt(keyword),
-    ])
-  }
-
-  const allResults: SearchResult[] = []
-
-  for (const result of results) {
-    if (result.status === 'fulfilled') {
-      allResults.push(...result.value)
-    }
-  }
+  const finalResults = Array.from(allResultsMap.values())
 
   // Sort by date, newest first
-  allResults.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+  finalResults.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
 
-  return allResults
+  return finalResults
 }
 
 export async function searchSource(
