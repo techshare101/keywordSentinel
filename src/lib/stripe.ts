@@ -14,11 +14,10 @@ export function getStripe() {
 }
 
 // Re-export PLANS from separate file for client-side usage
-export { PLANS, type PlanType } from './plans'
+export { PLANS, type PlanId } from './plans'
 
-// Helper to get price IDs (server-side only)
-export function getPriceId(plan: 'pro' | 'team'): string | undefined {
-  if (plan === 'pro') return process.env.STRIPE_PRO_PRICE_ID
-  if (plan === 'team') return process.env.STRIPE_TEAM_PRICE_ID
-  return undefined
+// Helper to get price IDs (server-side only) - deprecated, use PLANS directly
+export function getPriceId(plan: string): string | undefined {
+  const { PLANS } = require('./plans')
+  return PLANS[plan]?.priceId || undefined
 }

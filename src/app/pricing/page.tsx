@@ -1,17 +1,21 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Check, Loader2, Radar } from 'lucide-react'
-import { PLANS } from '@/lib/plans'
+import { Check, Loader2, Radar, X, Zap, Crown, Building2, Sparkles } from 'lucide-react'
+import { PLANS, type PlanId } from '@/lib/plans'
 
-export default function PricingPage() {
+const PLAN_ORDER: PlanId[] = ['free', 'starter', 'pro', 'business']
+
+function PricingContent() {
   const [loading, setLoading] = useState<string | null>(null)
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const highlightPlan = searchParams.get('highlight')
 
   const handleSubscribe = async (plan: string) => {
     if (plan === 'free') {
@@ -50,6 +54,15 @@ export default function PricingPage() {
       alert('Failed to start checkout. Please try again.')
     } finally {
       setLoading(null)
+    }
+  }
+
+  const getPlanIcon = (planId: string) => {
+    switch (planId) {
+      case 'starter': return Zap
+      case 'pro': return Crown
+      case 'business': return Building2
+      default: return Sparkles
     }
   }
 
@@ -102,127 +115,111 @@ export default function PricingPage() {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto items-stretch">
-          {/* Free Plan */}
-          <Card className="border-white/5 bg-white/[0.02] backdrop-blur-xl flex flex-col hover:border-white/10 transition-all duration-300">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
-                {PLANS.free.name}
-              </CardTitle>
-              <CardDescription className="text-slate-500">
-                For exploring the signal
-              </CardDescription>
-              <div className="mt-6 flex items-baseline gap-1">
-                <span className="text-5xl font-bold text-white tracking-tight">$0</span>
-                <span className="text-slate-500">/month</span>
-              </div>
-            </CardHeader>
-            <CardContent className="flex-1">
-              <ul className="space-y-4">
-                {PLANS.free.features.map((feature) => (
-                  <li key={feature} className="flex items-start gap-2 text-slate-400 text-sm">
-                    {feature.includes('❌') ? (
-                      <span className="text-slate-600 line-through">{feature.replace('❌ ', '')}</span>
-                    ) : (
-                      <>
-                        <Check className="h-4 w-4 text-emerald-500 mt-0.5" />
-                        <span>{feature}</span>
-                      </>
-                    )}
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-8 text-xs text-slate-500 text-center italic">
-                Great for discovering what people talk about. Upgrade when you want to act.
-              </p>
-            </CardContent>
-            <CardFooter>
-              <Button
-                className="w-full bg-white/5 hover:bg-white/10 text-white border border-white/10"
-                onClick={() => handleSubscribe('free')}
-                disabled={loading === 'free'}
-              >
-                Start Free
-              </Button>
-            </CardFooter>
-          </Card>
+        {/* Pricing Grid - 4 Tiers */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto items-stretch">
+          {PLAN_ORDER.map((planId) => {
+            const plan = PLANS[planId]
+            const isPro = planId === 'pro'
+            const isHighlighted = highlightPlan === planId || (!highlightPlan && isPro)
+            const Icon = getPlanIcon(planId)
 
-          {/* Pro Plan */}
-          <Card className="border-emerald-500/20 bg-emerald-500/[0.03] backdrop-blur-2xl relative flex flex-col scale-105 shadow-2xl shadow-emerald-500/5 ring-1 ring-emerald-500/30">
-            <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[10px] font-bold uppercase tracking-widest px-4 py-1.5 rounded-full shadow-lg">
-              Unlock 🔥 Hot Leads
-            </div>
-            <CardHeader>
-              <CardTitle className="text-white flex items-center justify-between">
-                <span>{PLANS.pro.name}</span>
-                <Badge className="bg-emerald-500/20 text-emerald-400 border-none hover:bg-emerald-500/20">
-                  Most Popular
-                </Badge>
-              </CardTitle>
-              <CardDescription className="text-emerald-100/50">
-                ⚡ Most founders upgrade here
-              </CardDescription>
-              <div className="mt-6 flex items-baseline gap-1">
-                <span className="text-5xl font-bold text-white tracking-tight">${PLANS.pro.price}</span>
-                <span className="text-emerald-100/40">/month</span>
-              </div>
-            </CardHeader>
-            <CardContent className="flex-1">
-              <ul className="space-y-4">
-                {PLANS.pro.features.map((feature) => (
-                  <li key={feature} className="flex items-start gap-2 text-slate-300 text-sm">
-                    <Check className={`h-4 w-4 mt-0.5 ${feature.includes('🔥') ? 'text-orange-500' : 'text-emerald-500'}`} />
-                    <span className={feature.includes('🔥') ? 'font-bold text-white' : ''}>{feature}</span>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-            <CardFooter>
-              <Button
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20 h-12 text-lg font-semibold"
-                onClick={() => handleSubscribe('pro')}
-                disabled={loading === 'pro'}
+            return (
+              <Card 
+                key={planId}
+                className={`flex flex-col transition-all duration-300 ${
+                  isHighlighted 
+                    ? 'border-emerald-500/30 bg-emerald-500/[0.03] ring-1 ring-emerald-500/30 scale-[1.02] shadow-2xl shadow-emerald-500/10' 
+                    : 'border-white/5 bg-white/[0.02] hover:border-white/10'
+                }`}
               >
-                {loading === 'pro' ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                ) : (
-                  'Unlock Hot Leads'
+                {isPro && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full shadow-lg">
+                    Most Popular
+                  </div>
                 )}
-              </Button>
-            </CardFooter>
-          </Card>
+                <CardHeader className="pb-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className={`p-2 rounded-lg ${isHighlighted ? 'bg-emerald-500/20' : 'bg-white/5'}`}>
+                      <Icon className={`h-4 w-4 ${isHighlighted ? 'text-emerald-400' : 'text-slate-400'}`} />
+                    </div>
+                    <CardTitle className="text-white text-lg">{plan.name}</CardTitle>
+                  </div>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-4xl font-bold text-white tracking-tight">${plan.price}</span>
+                    <span className="text-slate-500 text-sm">/mo</span>
+                  </div>
+                  <CardDescription className="text-slate-500 text-xs mt-2">
+                    {planId === 'free' && 'Get started for free'}
+                    {planId === 'starter' && 'For solo founders'}
+                    {planId === 'pro' && 'For growing teams'}
+                    {planId === 'business' && 'For agencies & enterprises'}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex-1 pt-0">
+                  <ul className="space-y-2.5">
+                    {plan.features.map((feature) => {
+                      const isDisabled = feature.includes('❌')
+                      const isHot = feature.includes('🔥')
+                      return (
+                        <li key={feature} className="flex items-start gap-2 text-sm">
+                          {isDisabled ? (
+                            <>
+                              <X className="h-4 w-4 text-slate-600 mt-0.5 flex-shrink-0" />
+                              <span className="text-slate-600">{feature.replace('❌ ', '')}</span>
+                            </>
+                          ) : (
+                            <>
+                              <Check className={`h-4 w-4 mt-0.5 flex-shrink-0 ${isHot ? 'text-orange-500' : 'text-emerald-500'}`} />
+                              <span className={isHot ? 'font-semibold text-white' : 'text-slate-400'}>{feature}</span>
+                            </>
+                          )}
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </CardContent>
+                <CardFooter className="pt-4">
+                  <Button
+                    className={`w-full h-11 font-medium ${
+                      isHighlighted
+                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20'
+                        : 'bg-white/5 hover:bg-white/10 text-white border border-white/10'
+                    }`}
+                    onClick={() => handleSubscribe(planId)}
+                    disabled={loading === planId}
+                  >
+                    {loading === planId ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : planId === 'free' ? (
+                      'Start Free'
+                    ) : (
+                      `Get ${plan.name}`
+                    )}
+                  </Button>
+                </CardFooter>
+              </Card>
+            )
+          })}
+        </div>
 
-          {/* Team Plan */}
-          <Card className="border-white/5 bg-white/[0.02] backdrop-blur-xl flex flex-col hover:border-white/10 transition-all duration-300">
-            <CardHeader>
-              <CardTitle className="text-white">{PLANS.team.name}</CardTitle>
-              <CardDescription className="text-slate-500">
-                Built for agencies & teams
-              </CardDescription>
-              <div className="mt-6 flex items-baseline gap-1">
-                <span className="text-5xl font-bold text-white tracking-tight">${PLANS.team.price}</span>
-                <span className="text-slate-500">/month</span>
+        {/* Enterprise CTA */}
+        <div className="mt-12 max-w-3xl mx-auto">
+          <Card className="border-white/5 bg-gradient-to-r from-slate-900/50 to-slate-800/50 backdrop-blur-xl">
+            <CardContent className="flex flex-col md:flex-row items-center justify-between gap-6 p-8">
+              <div>
+                <h3 className="text-xl font-bold text-white mb-2">Need Enterprise?</h3>
+                <p className="text-slate-400 text-sm">
+                  Custom limits, dedicated support, SLA, and white-glove onboarding for large teams.
+                </p>
               </div>
-            </CardHeader>
-            <CardContent className="flex-1">
-              <ul className="space-y-4">
-                {PLANS.team.features.map((feature) => (
-                  <li key={feature} className="flex items-start gap-2 text-slate-400 text-sm">
-                    <Check className="h-4 w-4 text-emerald-500 mt-0.5" />
-                    <span>{feature}</span>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-            <CardFooter>
-              <Button
-                className="w-full bg-white/5 hover:bg-white/10 text-white border border-white/10"
-                onClick={() => handleSubscribe('team')}
-                disabled={loading === 'team'}
+              <Button 
+                variant="outline" 
+                className="border-white/20 text-white hover:bg-white/10 whitespace-nowrap"
+                onClick={() => window.location.href = 'mailto:enterprise@keywordsentinel.ai'}
               >
-                Upgrade to Team
+                Contact Sales
               </Button>
-            </CardFooter>
+            </CardContent>
           </Card>
         </div>
 
@@ -251,5 +248,17 @@ export default function PricingPage() {
         </div>
       </main>
     </div>
+  )
+}
+
+export default function PricingPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#020617] flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
+      </div>
+    }>
+      <PricingContent />
+    </Suspense>
   )
 }

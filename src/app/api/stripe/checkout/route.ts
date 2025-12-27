@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getStripe, getPriceId, PLANS } from '@/lib/stripe'
+import { getStripe } from '@/lib/stripe'
+import { PLANS, type PlanId } from '@/lib/plans'
 
 export const dynamic = 'force-dynamic'
+
+const VALID_PLANS: PlanId[] = ['starter', 'pro', 'business']
 
 export async function POST(request: Request) {
   try {
@@ -15,15 +18,17 @@ export async function POST(request: Request) {
 
     const { plan } = await request.json()
 
-    if (!plan || (plan !== 'pro' && plan !== 'team')) {
+    if (!plan || !VALID_PLANS.includes(plan)) {
       return NextResponse.json(
-        { error: 'Invalid plan' },
+        { error: 'Invalid plan. Must be starter, pro, or business.' },
         { status: 400 }
       )
     }
 
-    // Get price ID from environment based on plan
-    const priceId = getPriceId(plan)
+    // Get price ID from plans config
+    const planConfig = PLANS[plan as PlanId]
+    const priceId = planConfig?.priceId
+    
     if (!priceId) {
       return NextResponse.json(
         { error: 'Price not configured for this plan' },

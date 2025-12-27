@@ -2,6 +2,7 @@ import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { getStripe } from '@/lib/stripe'
 import { createClient } from '@supabase/supabase-js'
+import { PLANS, getPriceIdToPlan } from '@/lib/plans'
 import Stripe from 'stripe'
 
 export const dynamic = 'force-dynamic'
@@ -11,6 +12,22 @@ function getSupabaseAdmin() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
+}
+
+function getPlanFromPriceId(priceId: string) {
+  const plan = getPriceIdToPlan(priceId)
+  if (!plan) {
+    return {
+      id: 'free',
+      keywordsLimit: 3,
+      scanInterval: 60,
+    }
+  }
+  return {
+    id: plan.id,
+    keywordsLimit: plan.keywords,
+    scanInterval: plan.scanInterval,
+  }
 }
 
 export async function POST(request: Request) {
@@ -38,6 +55,8 @@ export async function POST(request: Request) {
     )
   }
 
+  console.log(`[Stripe Webhook] Event: ${event.type}`)
+
   try {
     switch (event.type) {
       case 'checkout.session.completed': {
@@ -50,24 +69,14 @@ export async function POST(request: Request) {
 
           const userId = session.metadata?.user_id
           if (!userId) {
-            console.error('No user_id in session metadata')
+            console.error('[Stripe Webhook] No user_id in session metadata')
             break
           }
 
-          // Determine plan based on price
           const priceId = subscription.items.data[0]?.price.id
-          let plan = 'free'
-          let keywordsLimit = 3
-          let scanInterval = 60
-          if (priceId === process.env.STRIPE_PRO_PRICE_ID) {
-            plan = 'pro'
-            keywordsLimit = 30
-            scanInterval = 15
-          } else if (priceId === process.env.STRIPE_TEAM_PRICE_ID) {
-            plan = 'team'
-            keywordsLimit = 200
-            scanInterval = 5
-          }
+          const planInfo = getPlanFromPriceId(priceId)
+
+          console.log(`[Stripe Webhook] Checkout complete: user=${userId}, plan=${planInfo.id}`)
 
           // Update user subscription
           await getSupabaseAdmin()
@@ -76,9 +85,9 @@ export async function POST(request: Request) {
               stripe_customer_id: session.customer as string,
               stripe_subscription_id: subscription.id,
               subscription_status: subscription.status,
-              plan,
-              keywords_limit: keywordsLimit,
-              scan_interval_minutes: scanInterval,
+              plan: planInfo.id,
+              keywords_limit: planInfo.keywordsLimit,
+              scan_interval_minutes: planInfo.scanInterval,
             })
             .eq('id', userId)
         }
@@ -97,26 +106,17 @@ export async function POST(request: Request) {
 
         if (user) {
           const priceId = subscription.items.data[0]?.price.id
-          let plan = 'free'
-          let keywordsLimit = 3
-          let scanInterval = 60
-          if (priceId === process.env.STRIPE_PRO_PRICE_ID) {
-            plan = 'pro'
-            keywordsLimit = 50
-            scanInterval = 15
-          } else if (priceId === process.env.STRIPE_TEAM_PRICE_ID) {
-            plan = 'team'
-            keywordsLimit = 200
-            scanInterval = 5
-          }
+          const planInfo = getPlanFromPriceId(priceId)
+
+          console.log(`[Stripe Webhook] Subscription updated: user=${user.id}, plan=${planInfo.id}, status=${subscription.status}`)
 
           await getSupabaseAdmin()
             .from('users')
             .update({
               subscription_status: subscription.status,
-              plan,
-              keywords_limit: keywordsLimit,
-              scan_interval_minutes: scanInterval,
+              plan: planInfo.id,
+              keywords_limit: planInfo.keywordsLimit,
+              scan_interval_minutes: planInfo.scanInterval,
             })
             .eq('id', user.id)
         }
