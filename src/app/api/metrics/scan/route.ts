@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
     const supabase = await createClient()
 
@@ -13,12 +15,24 @@ export async function GET() {
         .from('scan_runs')
         .select('*')
         .eq('user_id', user.id)
-        .order('started_at', { ascending: false })
-        .limit(5)
+        .order('created_at', { ascending: false })
+        .limit(10)
 
     if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ runs: data })
+    // Map to expected format
+    const runs = (data || []).map(run => ({
+        id: run.id,
+        started_at: run.created_at,
+        finished_at: run.finished_at,
+        keywords_scanned: run.keywords_scanned || 0,
+        matches_found: run.matches_found || 0,
+        aborted: !run.finished_at,
+        error: null,
+        duration_ms: run.duration_ms
+    }))
+
+    return NextResponse.json({ runs })
 }

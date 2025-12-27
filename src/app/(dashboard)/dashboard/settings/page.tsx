@@ -28,6 +28,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { UserSettings, User as UserType } from '@/types/database'
+import { FirecrawlUsage } from '@/components/dashboard/firecrawl-usage'
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
@@ -363,6 +364,11 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Firecrawl Usage - Only show for pro/team users */}
+      {currentPlan !== 'free' && (
+        <FirecrawlUsage />
+      )}
     </div>
   )
 }

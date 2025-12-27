@@ -21,9 +21,16 @@ npm run lint     # Run ESLint
 Copy `env.example` to `.env.local` and configure:
 - **Supabase**: URL, anon key, and service role key
 - **OpenAI**: API key for AI summarization (GPT-4o-mini)
+- **OpenRouter**: API key for lead discovery LLM (primary provider for scanning)
 - **Firecrawl**: API key for enhanced web scraping (optional, falls back to free APIs)
-- **Resend**: API key for email alerts
+- **Resend**: API key for email alerts (requires domain verification)
 - **CRON_SECRET_KEY**: Secret for securing the `/api/scan` endpoint
+
+### Manual Scanning
+```bash
+node run-scan.js              # Full scan for all users
+node run-scan.js <userId>     # Scan specific user only
+```
 
 ### Database Setup
 Run `supabase/migrations/001_initial_schema.sql` in Supabase SQL Editor. This creates:
@@ -93,11 +100,21 @@ Located in `src/app/api/`:
 
 ## Key Services
 
-### AI Service (`lib/services/ai.ts`)
-- `analyzeMatch()`: Analyzes content and returns `AIAnalysis` with summary, sentiment, lead score (0-100), and suggested action
-- Uses GPT-4o-mini with JSON-only responses
+### LLM Service (`lib/services/llm.ts`)
+- `analyzeLeadDiscovery()`: Primary lead scoring using OpenRouter (GPT-4o-mini)
+  - Returns: score (0-100), intent (buying/researching/complaining/casual/irrelevant), pain_summary, why_it_matters
+  - Threshold: score >= 20 to be saved as a match
+  - Bucket: score >= 70 = "hot", otherwise "warm"
+- `analyzeMatch()`: Detailed analysis using OpenAI for premium features
 - Falls back to defaults on error
-- `batchAnalyzeMatches()`: Processes in batches of 5 to avoid rate limits
+
+### Insights API (`/api/insights/overview`)
+Returns dashboard statistics:
+- Hot/warm lead counts, unseen count, estimated value
+- 7-day trend with growth percentage
+- Sentiment and source breakdown
+- Intent distribution from metadata
+- Recent scan information
 
 ### Alert Service (`lib/services/alerts.ts`)
 Sends notifications via:
@@ -106,8 +123,11 @@ Sends notifications via:
 - Discord (webhooks)
 
 ### Scanner Service (`lib/services/scanner.ts`)
-- `scanKeywordsForUser(userId)`: Scans all active keywords for a user
-- `runFullScan()`: Scans all users (called by cron)
+- `scanKeywordsForUser(userId)`: Scans all active keywords for a specific user
+- `runFullScan()`: Scans ALL keywords for ALL users (prioritizes pro/team users first)
+  - No keyword limit per run - processes everything
+  - 5-second delay between keywords to avoid rate limits
+  - Returns: usersScanned, totalMatches, keywordsScanned, duration, errors
 - Deduplicates by URL + keyword_id
 - Limits to 20 new matches per scan per keyword
 
@@ -116,6 +136,23 @@ Generates weekly email summaries of matches
 
 ### Reply Generator (`lib/services/reply-generator.ts`)
 AI-powered reply suggestions for matches
+
+### Firecrawl SAFE Module (`lib/services/firecrawl-safe.ts`)
+**CRITICAL: Firecrawl is a PROTECTED RESOURCE - NEVER used in automated scans!**
+
+Firecrawl is expensive and burns credits unpredictably. It is ONLY used for:
+1. Manual "Deep Enrich" button on lead cards (Pro/Team users only)
+2. Never in cron jobs, never in `/api/scan`, never automatically
+
+**Hard Limits:**
+- 10 calls per day (global)
+- 2 calls per user per hour
+- 100 calls per month (~$5 budget)
+
+**Safe Config:** Only markdown format, no embeddings, no summarization, no recursive crawling.
+
+API: `POST /api/enrich` - Manual lead enrichment (requires auth)
+API: `GET /api/enrich` - Get usage stats
 
 ## Database Schema
 

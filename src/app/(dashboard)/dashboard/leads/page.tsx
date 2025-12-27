@@ -21,10 +21,12 @@ import { ReplyGenerator } from '@/components/dashboard/reply-generator'
 import { LeadReAnalyzer } from '@/components/dashboard/lead-re-analyzer'
 import { LeadStrategyModal } from '@/components/dashboard/lead-strategy-modal'
 import { BookmarkButton } from '@/components/dashboard/bookmark-button'
+import { EnrichButton } from '@/components/dashboard/enrich-button'
 import type { Match } from '@/types/database'
 
 interface LeadMatch extends Match {
   keywords: { keyword: string }
+  enriched_at?: string | null
 }
 
 const scoreColors: Record<string, string> = {
@@ -291,6 +293,12 @@ export default function LeadsPage() {
                             <BookmarkButton
                               matchId={lead.id}
                               initialBookmarked={lead.is_bookmarked || false}
+                            />
+                            <EnrichButton
+                              matchId={lead.id}
+                              url={lead.url}
+                              isEnriched={!!lead.enriched_at}
+                              userPlan={userPlan}
                             />
                             <LeadReAnalyzer
                               lead={lead}

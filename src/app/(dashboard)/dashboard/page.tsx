@@ -15,6 +15,7 @@ import Link from 'next/link'
 import { ScanButton } from '@/components/dashboard/scan-button'
 import { DigestButton } from '@/components/dashboard/digest-button'
 import { ScanMetrics } from '@/components/dashboard/scan-metrics'
+import { InsightsOverview } from '@/components/dashboard/insights-overview'
 
 const sourceIcons: Record<string, string> = {
   reddit: '🔴',
@@ -98,17 +99,18 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      {/* Mobile-responsive header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-          <p className="text-slate-400">Monitor your keywords and track mentions across the web.</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-white">Dashboard</h1>
+          <p className="text-sm sm:text-base text-slate-400">Monitor your keywords and track mentions across the web.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <DigestButton
             variant="outline"
-            className="border-slate-700 text-slate-300 hover:bg-slate-800"
+            className="border-slate-700 text-slate-300 hover:bg-slate-800 text-xs sm:text-sm"
           />
-          <ScanButton className="bg-emerald-600 hover:bg-emerald-700 text-white" />
+          <ScanButton className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm" />
         </div>
       </div>
 
@@ -136,6 +138,9 @@ export default async function DashboardPage() {
           </Card>
         ))}
       </div>
+
+      {/* Insights Overview */}
+      <InsightsOverview />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="space-y-6">

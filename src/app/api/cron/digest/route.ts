@@ -1,57 +1,56 @@
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-export const maxDuration = 300 // 5 minutes max for full scans
+export const maxDuration = 300
 
 import { NextResponse } from 'next/server'
-import { runFullScan } from '@/lib/services/scanner'
+import { sendAllWeeklyDigests } from '@/lib/services/digest'
 
 /**
- * Vercel CRON endpoint for automated scans
- * Runs every 30 minutes (configured in vercel.json)
+ * CRON endpoint for sending email digests
  * 
- * Authentication: Vercel automatically adds Authorization header
- * Fallback: Also accepts CRON_SECRET_KEY for manual testing
+ * Schedule: Weekly on Mondays at 9am (configured in vercel.json)
+ * Can also be triggered manually for testing
  */
 export async function GET(req: Request) {
   const authHeader = req.headers.get('authorization') ?? req.headers.get('Authorization')
   const cronSecretHeader = req.headers.get('x-cron-secret')
   
-  // Check for Vercel CRON_SECRET or our CRON_SECRET_KEY
   const expectedSecret = process.env.CRON_SECRET || process.env.CRON_SECRET_KEY
   
   if (!expectedSecret) {
-    console.error('[CRON] No CRON_SECRET or CRON_SECRET_KEY configured')
+    console.error('[DIGEST CRON] No CRON secret configured')
     return NextResponse.json({ error: 'CRON secret not configured' }, { status: 500 })
   }
 
-  // Validate authorization
   const token = authHeader?.replace('Bearer ', '').trim()
   const isAuthorized = token === expectedSecret || cronSecretHeader === expectedSecret
 
   if (!isAuthorized) {
-    console.warn('[CRON] Unauthorized scan attempt')
+    console.warn('[DIGEST CRON] Unauthorized attempt')
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  console.log('[CRON] Starting scheduled full scan...')
+  console.log('[DIGEST CRON] Starting weekly digest send...')
   const startTime = Date.now()
 
   try {
-    const result = await runFullScan()
+    const result = await sendAllWeeklyDigests()
     
-    console.log(`[CRON] Scan complete: ${result.keywordsScanned} keywords, ${result.totalMatches} matches, ${result.duration}`)
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1)
+    console.log(`[DIGEST CRON] Complete: ${result.sent} sent, ${result.failed} failed in ${duration}s`)
     
     return NextResponse.json({
       ok: true,
       timestamp: new Date().toISOString(),
-      ...result,
+      sent: result.sent,
+      failed: result.failed,
+      duration: `${duration}s`,
     })
   } catch (error) {
-    console.error('[CRON] Scan error:', error)
+    console.error('[DIGEST CRON] Error:', error)
     return NextResponse.json({
       ok: false,
       error: (error as Error).message,
-      duration: `${((Date.now() - startTime) / 1000).toFixed(1)}s`
     }, { status: 500 })
   }
 }

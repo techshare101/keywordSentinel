@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { NotificationCenter } from '@/components/dashboard/notification-center'
+import { MobileMenuButton } from '@/components/dashboard/sidebar'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,9 +32,13 @@ export function Header({ user }: HeaderProps) {
     : user.email[0].toUpperCase()
 
   return (
-    <header className="flex h-16 items-center justify-between border-b border-slate-800 bg-slate-900 px-6">
-      <div className="flex items-center gap-4 flex-1">
-        <div className="relative max-w-md flex-1">
+    <header className="flex h-16 items-center justify-between border-b border-slate-800 bg-slate-900 px-4 lg:px-6">
+      <div className="flex items-center gap-3 flex-1">
+        {/* Mobile Menu Button */}
+        <MobileMenuButton />
+        
+        {/* Search - Hidden on mobile, visible on tablet+ */}
+        <div className="relative max-w-md flex-1 hidden sm:block">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
           <Input
             placeholder="Search matches..."

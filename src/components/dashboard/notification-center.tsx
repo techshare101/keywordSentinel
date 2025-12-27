@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -12,30 +12,29 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Bell, TrendingUp, ExternalLink, Check } from 'lucide-react'
+import { Bell, TrendingUp, Flame, Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { cn } from '@/lib/utils'
 
 interface Notification {
   id: string
-  type: 'match' | 'alert'
+  type: 'match' | 'lead' | 'alert'
   title: string
   description: string
   url?: string
   timestamp: string
   isRead: boolean
+  leadScore?: number
 }
 
 export function NotificationCenter() {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
+  const [isOpen, setIsOpen] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
-  useEffect(() => {
-    fetchNotifications()
-  }, [])
-
-  const fetchNotifications = async () => {
+  const fetchNotifications = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
@@ -45,21 +44,32 @@ export function NotificationCenter() {
       .eq('user_id', user.id)
       .eq('is_read', false)
       .order('created_at', { ascending: false })
-      .limit(10)
+      .limit(15)
 
     const notifs: Notification[] = (matches || []).map((match: any) => ({
       id: match.id,
-      type: 'match',
-      title: `New: ${match.keywords?.keyword}`,
-      description: match.title.slice(0, 50) + '...',
+      type: match.lead_score >= 70 ? 'lead' : 'match',
+      title: match.lead_score >= 70 
+        ? `🔥 Hot Lead: ${match.keywords?.keyword}`
+        : `New: ${match.keywords?.keyword}`,
+      description: match.title?.slice(0, 60) + (match.title?.length > 60 ? '...' : ''),
       url: match.url,
       timestamp: match.created_at,
       isRead: match.is_read,
+      leadScore: match.lead_score,
     }))
 
     setNotifications(notifs)
     setLoading(false)
-  }
+  }, [supabase])
+
+  useEffect(() => {
+    fetchNotifications()
+    
+    // Refresh notifications every 2 minutes
+    const interval = setInterval(fetchNotifications, 120000)
+    return () => clearInterval(interval)
+  }, [fetchNotifications])
 
   const markAsRead = async (id: string) => {
     await supabase
@@ -126,25 +136,47 @@ export function NotificationCenter() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator className="bg-slate-700" />
         
-        {notifications.length > 0 ? (
-          <div className="max-h-[300px] overflow-y-auto">
+        {loading ? (
+          <div className="py-8 text-center">
+            <Loader2 className="h-6 w-6 text-slate-500 mx-auto mb-2 animate-spin" />
+            <p className="text-sm text-slate-400">Loading...</p>
+          </div>
+        ) : notifications.length > 0 ? (
+          <div className="max-h-[350px] overflow-y-auto">
             {notifications.map((notif) => (
               <DropdownMenuItem
                 key={notif.id}
-                className="flex items-start gap-3 p-3 cursor-pointer focus:bg-slate-700"
+                className={cn(
+                  "flex items-start gap-3 p-3 cursor-pointer focus:bg-slate-700",
+                  notif.type === 'lead' && "bg-orange-500/5"
+                )}
                 onClick={() => {
                   markAsRead(notif.id)
                   if (notif.url) window.open(notif.url, '_blank')
                 }}
               >
-                <div className="rounded-full bg-emerald-500/10 p-2 mt-0.5">
-                  <TrendingUp className="h-3 w-3 text-emerald-400" />
+                <div className={cn(
+                  "rounded-full p-2 mt-0.5",
+                  notif.type === 'lead' 
+                    ? "bg-orange-500/10" 
+                    : "bg-emerald-500/10"
+                )}>
+                  {notif.type === 'lead' ? (
+                    <Flame className="h-3 w-3 text-orange-400" />
+                  ) : (
+                    <TrendingUp className="h-3 w-3 text-emerald-400" />
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-white truncate">{notif.title}</p>
                   <p className="text-xs text-slate-400 truncate">{notif.description}</p>
+                  {notif.leadScore && notif.leadScore >= 70 && (
+                    <span className="text-[10px] text-orange-400 font-medium">
+                      Score: {notif.leadScore}
+                    </span>
+                  )}
                 </div>
-                <span className="text-xs text-slate-500">{formatTime(notif.timestamp)}</span>
+                <span className="text-xs text-slate-500 flex-shrink-0">{formatTime(notif.timestamp)}</span>
               </DropdownMenuItem>
             ))}
           </div>
@@ -152,6 +184,7 @@ export function NotificationCenter() {
           <div className="py-8 text-center">
             <Bell className="h-8 w-8 text-slate-600 mx-auto mb-2" />
             <p className="text-sm text-slate-400">No new notifications</p>
+            <p className="text-xs text-slate-500 mt-1">You're all caught up!</p>
           </div>
         )}
 
