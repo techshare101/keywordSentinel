@@ -18,6 +18,8 @@ import {
   AlertTriangle,
 } from 'lucide-react'
 import { ReplyGenerator } from '@/components/dashboard/reply-generator'
+import { LeadReAnalyzer } from '@/components/dashboard/lead-re-analyzer'
+import { LeadStrategyModal } from '@/components/dashboard/lead-strategy-modal'
 import { BookmarkButton } from '@/components/dashboard/bookmark-button'
 import type { Match } from '@/types/database'
 
@@ -172,7 +174,7 @@ export default function LeadsPage() {
               </div>
               <div>
                 <h3 className="text-sm font-bold text-white">🔥 Hot Leads are hidden on Free</h3>
-                <p className="text-xs text-slate-400">Someone is actively looking for a tool like yours right now. Upgrade to Pro to unlock real-time buyer intent.</p>
+                <p className="text-xs text-slate-400">🔥 Want deeper insight or a ready-to-send reply? Upgrade to Pro to unlock premium analysis.</p>
               </div>
             </div>
             <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white shrink-0" asChild>
@@ -290,12 +292,21 @@ export default function LeadsPage() {
                               matchId={lead.id}
                               initialBookmarked={lead.is_bookmarked || false}
                             />
+                            <LeadReAnalyzer
+                              lead={lead}
+                              userPlan={userPlan}
+                            />
+                            <LeadStrategyModal
+                              lead={lead}
+                              userPlan={userPlan}
+                            />
                             <ReplyGenerator
                               matchId={lead.id}
                               title={lead.title}
                               content={lead.content}
                               source={lead.source}
                               url={lead.url}
+                              userPlan={userPlan}
                             />
                             <a
                               href={lead.url}

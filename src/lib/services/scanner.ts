@@ -1,8 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { searchAllSources, type SearchResult } from './sources'
 import { FirecrawlRateLimitError, FirecrawlCreditsExhaustedError } from './sources/firecrawl'
-import { analyzeMatch } from './ai'
-import { calculateHeuristicScore } from './scoring'
+import { analyzeLeadDiscovery } from './llm'
 import { sendEmailAlert, sendSlackAlert, sendDiscordAlert } from './alerts'
 import type { Keyword, UserSettings } from '@/types/database'
 
@@ -127,19 +126,20 @@ async function scanKeyword(
     for (const searchResult of uniqueSearchResults.slice(0, 10)) {
       try {
         console.log(`Analyzing result: ${searchResult.url} from ${searchResult.source}`)
-        // Deterministic Lead Scoring
-        const heuristic = calculateHeuristicScore(
-          searchResult.title,
-          searchResult.content,
-          searchResult.source,
-          'neutral' // Default sentiment for now
-        )
-
-        const analysis = await analyzeMatch(
+        // OpenRouter Discovery Analysis (Cheap Model)
+        const discovery = await analyzeLeadDiscovery(
           searchResult.title,
           searchResult.content,
           keyword.keyword
         )
+
+        // Apply 40/70 thresholds
+        if (discovery.score < 40) {
+          console.log(`[Scanner] Discarding lead with low score (${discovery.score}): ${searchResult.url}`)
+          continue
+        }
+
+        const bucket = discovery.score >= 70 ? 'hot' : 'warm'
 
         const matchData = {
           keyword_id: keyword.id,
@@ -149,13 +149,18 @@ async function scanKeyword(
           content: searchResult.content.slice(0, 5000),
           url: searchResult.url,
           author: searchResult.author,
-          sentiment: analysis.sentiment,
-          ai_summary: analysis.summary,
-          lead_score: heuristic.score,
+          sentiment: discovery.intent === 'complaining' ? 'negative' : discovery.intent === 'buying' ? 'positive' : 'neutral',
+          ai_summary: discovery.pain_summary,
+          lead_score: discovery.score,
+          lead_bucket: bucket,
+          metadata: {
+            intent: discovery.intent,
+            why_it_matters: discovery.why_it_matters
+          }
         }
 
         toInsert.push(matchData)
-        console.log(`Prepared match for insertion: ${searchResult.title.slice(0, 30)}...`)
+        console.log(`[Scanner] ${bucket.toUpperCase()} lead found (${discovery.score}): ${searchResult.title.slice(0, 30)}...`)
       } catch (err) {
         console.error(`Error analyzing search result ${searchResult.url}:`, err)
       }

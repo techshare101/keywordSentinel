@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { generateReply } from '@/lib/services/reply-generator'
+import { generateReply } from '@/lib/services/llm'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,24 +13,31 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = await request.json()
-    const { title, content, source, context } = body
+    // Fetch user plan for gating
+    const { data: profile } = await supabase
+      .from('users')
+      .select('plan')
+      .eq('id', user.id)
+      .single()
 
-    if (!title || !content || !source) {
-      return NextResponse.json(
-        { error: 'Missing required fields: title, content, source' },
-        { status: 400 }
-      )
+    const userPlan = profile?.plan || 'free'
+
+    const body = await request.json()
+    const { lead, tone } = body
+
+    if (!lead) {
+      return NextResponse.json({ error: 'Missing lead data' }, { status: 400 })
     }
 
-    const reply = await generateReply(title, content, source, context)
+    const reply = await generateReply(lead, tone || 'professional', userPlan)
 
     return NextResponse.json({ reply })
   } catch (error) {
     console.error('Reply generation error:', error)
+    const message = (error as Error).message
     return NextResponse.json(
-      { error: 'Failed to generate reply' },
-      { status: 500 }
+      { error: message.includes('plan required') ? message : 'Failed to generate reply' },
+      { status: message.includes('plan required') ? 403 : 500 }
     )
   }
 }

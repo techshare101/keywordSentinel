@@ -20,22 +20,30 @@ interface ReplyGeneratorProps {
   content: string
   source: string
   url: string
+  userPlan?: string
 }
 
-export function ReplyGenerator({ matchId, title, content, source, url }: ReplyGeneratorProps) {
+export function ReplyGenerator({ matchId, title, content, source, url, userPlan = 'free' }: ReplyGeneratorProps) {
   const [open, setOpen] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [reply, setReply] = useState('')
   const [copied, setCopied] = useState(false)
+  const [tone, setTone] = useState<'professional' | 'casual' | 'helpful'>('helpful')
+
+  const isPremium = userPlan === 'pro' || userPlan === 'team'
 
   const generateReply = async () => {
+    if (!isPremium) return
     setGenerating(true)
-    
+
     try {
       const response = await fetch('/api/reply/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, content, source }),
+        body: JSON.stringify({
+          lead: { title, content, source, url },
+          tone
+        }),
       })
 
       const data = await response.json()
@@ -95,27 +103,61 @@ export function ReplyGenerator({ matchId, title, content, source, url }: ReplyGe
               AI Suggested Reply
             </DialogTitle>
             <DialogDescription className="text-slate-400">
-              Generated reply for: <span className="text-slate-300">{title.slice(0, 60)}...</span>
+              {isPremium
+                ? `Generated reply for: ${title.slice(0, 60)}...`
+                : "Upgrade to Pro to unlock AI-powered context-aware replies."}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            {generating ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
-                <span className="ml-3 text-slate-400">Generating reply...</span>
+            {!isPremium ? (
+              <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-lg p-6 text-center space-y-4">
+                <Sparkles className="h-10 w-10 text-emerald-500 mx-auto" />
+                <div className="space-y-2">
+                  <h3 className="text-white font-bold">Pro Feature</h3>
+                  <p className="text-slate-400 text-sm max-w-sm mx-auto">
+                    Stop writing manual replies. Upgrade to Pro to generate human-sounding, high-conversion responses with one click.
+                  </p>
+                </div>
+                <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" asChild>
+                  <a href="/pricing">Get Pro Access</a>
+                </Button>
               </div>
             ) : (
               <>
-                <Textarea
-                  value={reply}
-                  onChange={(e) => setReply(e.target.value)}
-                  placeholder="Your reply will appear here..."
-                  className="min-h-[150px] border-slate-700 bg-slate-800 text-white placeholder:text-slate-500 resize-none"
-                />
-                <p className="text-xs text-slate-500">
-                  Feel free to edit the reply before copying. Make it your own!
-                </p>
+                {/* Tone Selector */}
+                <div className="flex gap-2 mb-4">
+                  {(['professional', 'casual', 'helpful'] as const).map((t) => (
+                    <Button
+                      key={t}
+                      variant={tone === t ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setTone(t)}
+                      className={tone === t ? 'bg-emerald-600' : 'border-slate-700 text-slate-400'}
+                    >
+                      {t.charAt(0).toUpperCase() + t.slice(1)}
+                    </Button>
+                  ))}
+                </div>
+
+                {generating ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
+                    <span className="ml-3 text-slate-400">Generating {tone} reply...</span>
+                  </div>
+                ) : (
+                  <>
+                    <Textarea
+                      value={reply}
+                      onChange={(e) => setReply(e.target.value)}
+                      placeholder="Your reply will appear here..."
+                      className="min-h-[150px] border-slate-700 bg-slate-800 text-white placeholder:text-slate-500 resize-none"
+                    />
+                    <p className="text-xs text-slate-500">
+                      Feel free to edit the reply before copying. Make it your own!
+                    </p>
+                  </>
+                )}
               </>
             )}
           </div>
