@@ -44,7 +44,7 @@ export async function sendEmailAlert(
       .join('')
 
     const { error } = await resend.emails.send({
-      from: 'KeywordSentinel <alerts@keywordsentinel.ai>',
+      from: 'KeywordSentinel <alerts@keywordsentinel.com>',
       to: email,
       subject: `🔔 ${matches.length} new keyword match${matches.length > 1 ? 'es' : ''} found`,
       html: `
@@ -199,7 +199,7 @@ export async function sendActivationEmail(
 ): Promise<boolean> {
   try {
     const { error } = await resend.emails.send({
-      from: 'KeywordSentinel <hello@keywordsentinel.ai>',
+      from: 'KeywordSentinel <hello@keywordsentinel.com>',
       to: email,
       subject: '🚀 Your monitoring is now live!',
       html: `
