@@ -315,19 +315,22 @@ export default function KeywordsPage() {
         </CardContent>
       </Card>
 
-      {keywords.length >= keywordLimit && userPlan === 'free' && (
-        <Card className="border-amber-500/20 bg-amber-500/5">
-          <CardContent className="flex items-center gap-4 py-4">
-            <AlertCircle className="h-5 w-5 text-amber-400" />
+      {keywords.length >= keywordLimit && (
+        <Card className="border-amber-500/20 bg-gradient-to-r from-amber-500/5 to-orange-500/5">
+          <CardContent className="flex flex-col sm:flex-row items-start sm:items-center gap-4 py-4">
+            <AlertCircle className="h-5 w-5 text-amber-400 flex-shrink-0" />
             <div className="flex-1">
               <p className="font-medium text-white">Keyword limit reached</p>
               <p className="text-sm text-slate-400">
-                Upgrade to Pro for 50 keywords and faster scan intervals.
+                {userPlan === 'free' && 'Upgrade to Starter ($19/mo) for 7 keywords, or Pro ($49/mo) for 15 keywords.'}
+                {userPlan === 'starter' && 'Upgrade to Pro ($49/mo) for 15 keywords and competitor tracking.'}
+                {userPlan === 'pro' && 'Upgrade to Business ($99/mo) for 25 keywords and API access.'}
+                {userPlan === 'business' && 'Contact us for Enterprise with unlimited keywords.'}
               </p>
             </div>
-            <Link href="/pricing">
-              <Button className="bg-emerald-600 hover:bg-emerald-700 text-white">
-                Upgrade to Pro
+            <Link href={userPlan === 'business' ? 'mailto:enterprise@keywordsentinel.ai' : '/pricing'}>
+              <Button className="bg-emerald-600 hover:bg-emerald-700 text-white whitespace-nowrap">
+                {userPlan === 'business' ? 'Contact Sales' : 'Upgrade Now'}
               </Button>
             </Link>
           </CardContent>

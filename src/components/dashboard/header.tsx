@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { NotificationCenter } from '@/components/dashboard/notification-center'
 import { MobileMenuButton } from '@/components/dashboard/sidebar'
+import { PlanUsageBadge } from '@/components/dashboard/plan-usage-badge'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -47,7 +48,12 @@ export function Header({ user }: HeaderProps) {
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-4">
+        {/* Plan Usage Badge - Hidden on mobile */}
+        <div className="hidden sm:block">
+          <PlanUsageBadge />
+        </div>
+        
         <ThemeToggle />
         
         <NotificationCenter />
