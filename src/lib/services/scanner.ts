@@ -143,12 +143,16 @@ async function scanKeyword(
     const newMatches = []
     const toInsert: any[] = []
 
+    // Pro+ plans get advanced lead scoring
+    const useAdvancedScoring = ['pro', 'business', 'enterprise'].includes(plan)
+    
     for (const searchResult of uniqueSearchResults.slice(0, 10)) {
       try {
         const discovery = await analyzeLeadDiscovery(
           searchResult.title,
           searchResult.content,
-          keyword.keyword
+          keyword.keyword,
+          useAdvancedScoring
         )
 
         console.log(`[Scanner] Result "${searchResult.title.slice(0, 50)}..." scored ${discovery.score} (intent: ${discovery.intent})`)

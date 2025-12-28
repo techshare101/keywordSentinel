@@ -37,14 +37,57 @@ export interface DiscoveryResult {
 /**
  * Discovery Scan (Ungated - uses cheap models)
  * Used in the main scanner loop for volume processing.
+ * 
+ * SCORING CRITERIA (0-100):
+ * - 80-100: HOT LEAD - Explicit buying intent, budget mentioned, urgent timeline
+ * - 60-79: WARM LEAD - Clear pain point, actively researching solutions
+ * - 40-59: INTERESTED - Relevant discussion, potential future buyer
+ * - 20-39: COLD - Casual mention, no clear intent
+ * - 0-19: IRRELEVANT - Off-topic, spam, or no business value
  */
 export async function analyzeLeadDiscovery(
     title: string,
     content: string,
-    keyword: string
+    keyword: string,
+    advancedScoring: boolean = false
 ): Promise<DiscoveryResult> {
     const model = getModelForTask('discovery')
-    console.log(`[LLM] Discovery model: ${model}`)
+    console.log(`[LLM] Discovery model: ${model}, advanced: ${advancedScoring}`)
+
+    const systemPrompt = advancedScoring 
+        ? `You are an expert B2B lead qualification engine with deep understanding of buyer psychology and sales signals.
+
+Your task is to score social media posts for REAL buyer intent. You must be accurate - false positives waste sales time, false negatives lose deals.
+
+SCORING FRAMEWORK (0-100):
+- 90-100: IMMEDIATE BUYER - "Looking to buy", "need recommendations", mentions budget/timeline
+- 75-89: HIGH INTENT - Explicit pain point, comparing solutions, asking for alternatives
+- 60-74: ACTIVE RESEARCH - Evaluating options, asking detailed questions about features
+- 45-59: PROBLEM AWARE - Discussing challenges, may not know solutions exist
+- 30-44: CURIOUS - General interest, early stage awareness
+- 15-29: CASUAL - Tangential mention, no clear business need
+- 0-14: IRRELEVANT - Off-topic, spam, or clearly not a prospect
+
+INTENT SIGNALS TO LOOK FOR:
+✓ "Looking for", "need help with", "recommendations for"
+✓ Frustration with current solution
+✓ Budget or timeline mentions
+✓ Decision-maker language ("my team", "our company")
+✓ Comparison questions ("X vs Y")
+✓ Pain point descriptions with urgency
+
+RED FLAGS (lower score):
+✗ Just sharing news/articles
+✗ Academic/theoretical discussion
+✗ Already solved their problem
+✗ Clearly not the target market`
+        : `You are a lead qualification engine. Score whether a social post represents real buyer pain. Be conservative - false positives are worse than false negatives.
+
+SCORING (0-100):
+- 70+: Clear buying intent or urgent pain
+- 50-69: Active research or problem discussion
+- 30-49: Casual interest
+- 0-29: Irrelevant or no intent`
 
     try {
         const response = await openrouter.chat.completions.create({
@@ -52,40 +95,35 @@ export async function analyzeLeadDiscovery(
             messages: [
                 {
                     role: 'system',
-                    content: 'You are a lead qualification engine. Your task is to score whether a social post represents a real buyer pain. Be conservative. False positives (scoring junk as high intent) are worse than false negatives.',
+                    content: systemPrompt,
                 },
                 {
                     role: 'user',
-                    content: `Analyze the following post for the keyword "${keyword}".
-          
-Return ONLY valid JSON.
-
-Score from 0–100 based on:
-- Explicit pain
-- Urgency
-- Buyer intent
-- Authority of speaker
-
-Classify intent as one of: ["buying", "researching", "complaining", "casual", "irrelevant"]
+                    content: `Analyze this post for the keyword "${keyword}".
 
 Post Title: ${title}
-Post Content: ${content.slice(0, 1000)}
+Post Content: ${content.slice(0, 1500)}
 
-Output format:
+Return ONLY valid JSON:
 {
-  "score": number,
-  "intent": string,
-  "pain_summary": string,
-  "why_it_matters": string
+  "score": <number 0-100>,
+  "intent": <"buying" | "researching" | "complaining" | "casual" | "irrelevant">,
+  "pain_summary": <1-2 sentence summary of the pain/need>,
+  "why_it_matters": <why this is/isn't a good lead>
 }`,
                 },
             ],
-            temperature: 0.2,
+            temperature: 0.1,
             response_format: { type: 'json_object' },
         })
 
         const text = response.choices[0]?.message?.content || '{}'
-        return JSON.parse(text) as DiscoveryResult
+        const result = JSON.parse(text) as DiscoveryResult
+        
+        // Ensure score is within bounds
+        result.score = Math.max(0, Math.min(100, result.score))
+        
+        return result
     } catch (error) {
         console.error('[LLM] Discovery error:', error)
         return {
@@ -104,8 +142,8 @@ export async function analyzeLeadPremium(
     lead: any,
     userPlan: string
 ): Promise<string> {
-    if (userPlan !== 'pro' && userPlan !== 'team') {
-        throw new Error('Premium plan required for deep analysis')
+    if (!['pro', 'business', 'enterprise'].includes(userPlan)) {
+        throw new Error('Pro plan or higher required for deep analysis')
     }
 
     const model = getModelForTask('premium_analysis')
@@ -143,8 +181,8 @@ export async function generateReply(
     tone: 'professional' | 'casual' | 'helpful' | 'aggressive',
     userPlan: string
 ): Promise<string> {
-    if (userPlan !== 'pro' && userPlan !== 'team') {
-        throw new Error('Premium plan required for reply generation')
+    if (!['pro', 'business', 'enterprise'].includes(userPlan)) {
+        throw new Error('Pro plan or higher required for reply generation')
     }
 
     const model = getModelForTask('reply_generation')
