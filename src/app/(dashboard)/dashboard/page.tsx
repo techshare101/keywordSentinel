@@ -257,7 +257,7 @@ export default async function DashboardPage() {
               </div>
             </Link>
 
-            {profile?.plan === 'free' && (
+            {profile?.plan === 'starter' && (
               <div className="flex items-center gap-4 rounded-lg border border-dashed border-slate-700 bg-gradient-to-r from-emerald-500/5 to-cyan-500/5 p-4">
                 <div className="rounded-lg bg-emerald-500/10 p-3">
                   <Zap className="h-5 w-5 text-emerald-400" />
@@ -265,7 +265,7 @@ export default async function DashboardPage() {
                 <div className="flex-1">
                   <h4 className="font-medium text-white">Upgrade to Pro</h4>
                   <p className="text-sm text-slate-400">
-                    Get 50 keywords and 15-minute scans
+                    Get 15 keywords, competitor tracking & Slack alerts
                   </p>
                 </div>
                 <Link href="/pricing">
