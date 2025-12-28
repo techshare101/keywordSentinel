@@ -6,20 +6,21 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Check, Loader2, Radar, X, Zap, Crown, Building2, Sparkles } from 'lucide-react'
+import { Check, Loader2, Radar, Zap, Crown, Building2 } from 'lucide-react'
 import { PLANS, type PlanId } from '@/lib/plans'
 
-const PLAN_ORDER: PlanId[] = ['free', 'starter', 'pro', 'business']
+const PLAN_ORDER: PlanId[] = ['starter', 'pro', 'business']
 
 function PricingContent() {
   const [loading, setLoading] = useState<string | null>(null)
+  const [showEnterpriseModal, setShowEnterpriseModal] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
   const highlightPlan = searchParams.get('highlight')
 
   const handleSubscribe = async (plan: string) => {
-    if (plan === 'free') {
-      router.push('/signup')
+    if (plan === 'enterprise') {
+      setShowEnterpriseModal(true)
       return
     }
 
@@ -57,25 +58,10 @@ function PricingContent() {
     }
   }
 
-  const getPlanIcon = (planId: string) => {
-    switch (planId) {
-      case 'starter': return Zap
-      case 'pro': return Crown
-      case 'business': return Building2
-      default: return Sparkles
-    }
-  }
-
   return (
-    <div className="min-h-screen bg-[#020617] selection:bg-emerald-500/30">
-      {/* Premium Background Effect */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-emerald-500/10 rounded-full blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 rounded-full blur-[120px]" />
-      </div>
-
+    <div className="min-h-screen bg-[#0a0f1a] selection:bg-emerald-500/30">
       {/* Header */}
-      <header className="relative z-10 border-b border-white/5 backdrop-blur-md bg-black/20">
+      <header className="border-b border-slate-800/50 bg-[#0a0f1a]">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2 group">
             <div className="p-1.5 bg-emerald-500/10 rounded-lg group-hover:bg-emerald-500/20 transition-colors">
@@ -83,15 +69,20 @@ function PricingContent() {
             </div>
             <span className="text-xl font-bold text-white tracking-tight">KeywordSentinel</span>
           </Link>
-          <div className="flex items-center gap-4">
+          <nav className="hidden md:flex items-center gap-6 text-sm text-slate-400">
+            <Link href="#features" className="hover:text-white transition-colors">Features</Link>
+            <Link href="/pricing" className="text-white">Pricing</Link>
+            <Link href="#testimonials" className="hover:text-white transition-colors">Testimonials</Link>
+          </nav>
+          <div className="flex items-center gap-3">
             <Link href="/login">
               <Button variant="ghost" className="text-slate-400 hover:text-white hover:bg-white/5">
-                Sign In
+                Log in
               </Button>
             </Link>
             <Link href="/signup">
-              <Button className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-900/20">
-                Get Started
+              <Button className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                Get Started Free
               </Button>
             </Link>
           </div>
@@ -99,101 +90,79 @@ function PricingContent() {
       </header>
 
       {/* Hero Section */}
-      <main className="relative z-10 container mx-auto px-4 py-20">
-        <div className="text-center mb-20 space-y-4">
-          <Badge variant="outline" className="px-4 py-1 border-emerald-500/30 text-emerald-400 bg-emerald-500/5 backdrop-blur-sm mb-4">
-            Monetization-Ready Monitoring
+      <main className="container mx-auto px-4 py-16">
+        <div className="text-center mb-16">
+          <Badge variant="outline" className="px-3 py-1 border-slate-700 text-slate-400 bg-slate-800/50 mb-6">
+            Pricing
           </Badge>
-          <h1 className="text-5xl md:text-6xl font-extrabold text-white tracking-tight">
-            Stop monitoring keywords.<br />
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-blue-500">
-              Start catching buyers.
-            </span>
+          <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
+            Simple, Transparent Pricing
           </h1>
-          <p className="text-xl text-slate-400 max-w-2xl mx-auto leading-relaxed">
-            KeywordSentinel detects real-time buyer intent across the web — and tells you exactly when someone is ready to buy.
+          <p className="text-lg text-slate-400">
+            Start free. Upgrade when you need more power.
           </p>
         </div>
 
-        {/* Pricing Grid - 4 Tiers */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto items-stretch">
+        {/* Pricing Grid - 3 Tiers */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
           {PLAN_ORDER.map((planId) => {
             const plan = PLANS[planId]
             const isPro = planId === 'pro'
             const isHighlighted = highlightPlan === planId || (!highlightPlan && isPro)
-            const Icon = getPlanIcon(planId)
 
             return (
               <Card 
                 key={planId}
-                className={`flex flex-col transition-all duration-300 ${
-                  isHighlighted 
-                    ? 'border-emerald-500/30 bg-emerald-500/[0.03] ring-1 ring-emerald-500/30 scale-[1.02] shadow-2xl shadow-emerald-500/10' 
-                    : 'border-white/5 bg-white/[0.02] hover:border-white/10'
+                className={`relative flex flex-col bg-[#0f1629] border-slate-800 rounded-2xl overflow-hidden ${
+                  isHighlighted ? 'ring-1 ring-emerald-500/50' : ''
                 }`}
               >
                 {isPro && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full shadow-lg">
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 bg-emerald-500 text-white text-xs font-medium px-3 py-1 rounded-b-lg">
                     Most Popular
                   </div>
                 )}
-                <CardHeader className="pb-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className={`p-2 rounded-lg ${isHighlighted ? 'bg-emerald-500/20' : 'bg-white/5'}`}>
-                      <Icon className={`h-4 w-4 ${isHighlighted ? 'text-emerald-400' : 'text-slate-400'}`} />
-                    </div>
-                    <CardTitle className="text-white text-lg">{plan.name}</CardTitle>
+                <CardHeader className="pt-8 pb-4 text-center">
+                  <CardTitle className="text-xl text-white mb-2">{plan.name}</CardTitle>
+                  <div className="flex items-baseline justify-center gap-1">
+                    <span className="text-4xl font-bold text-white">${plan.price}</span>
+                    <span className="text-slate-500">/month</span>
                   </div>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-4xl font-bold text-white tracking-tight">${plan.price}</span>
-                    <span className="text-slate-500 text-sm">/mo</span>
-                  </div>
-                  <CardDescription className="text-slate-500 text-xs mt-2">
-                    {planId === 'free' && 'Get started for free'}
-                    {planId === 'starter' && 'For solo founders'}
-                    {planId === 'pro' && 'For growing teams'}
-                    {planId === 'business' && 'For agencies & enterprises'}
+                  <CardDescription className="text-slate-500 text-sm mt-2">
+                    {plan.description}
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="flex-1 pt-0">
-                  <ul className="space-y-2.5">
+                <CardContent className="flex-1 px-6">
+                  <ul className="space-y-3">
                     {plan.features.map((feature) => {
-                      const isDisabled = feature.includes('❌')
                       const isHot = feature.includes('🔥')
                       return (
-                        <li key={feature} className="flex items-start gap-2 text-sm">
-                          {isDisabled ? (
-                            <>
-                              <X className="h-4 w-4 text-slate-600 mt-0.5 flex-shrink-0" />
-                              <span className="text-slate-600">{feature.replace('❌ ', '')}</span>
-                            </>
-                          ) : (
-                            <>
-                              <Check className={`h-4 w-4 mt-0.5 flex-shrink-0 ${isHot ? 'text-orange-500' : 'text-emerald-500'}`} />
-                              <span className={isHot ? 'font-semibold text-white' : 'text-slate-400'}>{feature}</span>
-                            </>
-                          )}
+                        <li key={feature} className="flex items-center gap-3 text-sm">
+                          <Check className="h-4 w-4 text-emerald-500 flex-shrink-0" />
+                          <span className={isHot ? 'text-white font-medium' : 'text-slate-300'}>
+                            {feature}
+                          </span>
                         </li>
                       )
                     })}
                   </ul>
                 </CardContent>
-                <CardFooter className="pt-4">
+                <CardFooter className="p-6 pt-4">
                   <Button
-                    className={`w-full h-11 font-medium ${
-                      isHighlighted
-                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20'
-                        : 'bg-white/5 hover:bg-white/10 text-white border border-white/10'
+                    className={`w-full h-11 rounded-lg font-medium ${
+                      isPro
+                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                        : 'bg-slate-800 hover:bg-slate-700 text-white border border-slate-700'
                     }`}
                     onClick={() => handleSubscribe(planId)}
                     disabled={loading === planId}
                   >
                     {loading === planId ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : planId === 'free' ? (
-                      'Start Free'
+                    ) : isPro ? (
+                      'Start Pro Trial'
                     ) : (
-                      `Get ${plan.name}`
+                      'Get Started'
                     )}
                   </Button>
                 </CardFooter>
@@ -202,20 +171,25 @@ function PricingContent() {
           })}
         </div>
 
-        {/* Enterprise CTA */}
-        <div className="mt-12 max-w-3xl mx-auto">
-          <Card className="border-white/5 bg-gradient-to-r from-slate-900/50 to-slate-800/50 backdrop-blur-xl">
+        {/* Enterprise Section */}
+        <div className="mt-12 max-w-5xl mx-auto">
+          <Card className="bg-[#0f1629] border-slate-800 rounded-2xl">
             <CardContent className="flex flex-col md:flex-row items-center justify-between gap-6 p-8">
-              <div>
-                <h3 className="text-xl font-bold text-white mb-2">Need Enterprise?</h3>
-                <p className="text-slate-400 text-sm">
-                  Custom limits, dedicated support, SLA, and white-glove onboarding for large teams.
-                </p>
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-purple-500/10 rounded-xl">
+                  <Building2 className="h-8 w-8 text-purple-400" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-white mb-1">Enterprise</h3>
+                  <p className="text-slate-400 text-sm">
+                    Unlimited keywords, custom integrations, SLA, SSO, and dedicated support.
+                  </p>
+                </div>
               </div>
               <Button 
                 variant="outline" 
-                className="border-white/20 text-white hover:bg-white/10 whitespace-nowrap"
-                onClick={() => window.location.href = 'mailto:enterprise@keywordsentinel.ai'}
+                className="bg-slate-800 border-slate-700 text-white hover:bg-slate-700 px-8"
+                onClick={() => setShowEnterpriseModal(true)}
               >
                 Contact Sales
               </Button>
@@ -223,8 +197,8 @@ function PricingContent() {
           </Card>
         </div>
 
-        {/* Trust/Footer */}
-        <div className="mt-24 max-w-3xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 text-center border-t border-white/5 pt-12">
+        {/* Trust Badges */}
+        <div className="mt-20 max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
           <div>
             <div className="text-white font-semibold mb-1">Cancel Anytime</div>
             <div className="text-xs text-slate-500">No lock-in contracts</div>
@@ -235,18 +209,56 @@ function PricingContent() {
           </div>
           <div>
             <div className="text-white font-semibold mb-1">Instant Activation</div>
-            <div className="text-xs text-slate-500">Unlock intent leads now</div>
+            <div className="text-xs text-slate-500">Start monitoring now</div>
           </div>
           <div>
             <div className="text-white font-semibold mb-1">7-Day Guarantee</div>
             <div className="text-xs text-slate-500">100% money back</div>
           </div>
         </div>
-
-        <div className="mt-16 text-center text-slate-500 text-sm">
-          You only pay to unlock real buyer intent. Start small, grow with us.
-        </div>
       </main>
+
+      {/* Enterprise Modal */}
+      {showEnterpriseModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <Card className="bg-slate-900 border-slate-800 max-w-md w-full">
+            <CardHeader>
+              <CardTitle className="text-white text-center">Enterprise Inquiry</CardTitle>
+              <CardDescription className="text-slate-400 text-center">
+                Contact our team for custom enterprise solutions.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="bg-slate-800/50 rounded-lg p-4 text-center">
+                <p className="text-slate-300 mb-4">
+                  For enterprise onboarding, custom integrations, and volume pricing, please reach out to our sales team.
+                </p>
+                <a 
+                  href="mailto:enterprise@keywordsentinel.ai"
+                  className="text-emerald-400 hover:text-emerald-300 font-medium"
+                >
+                  enterprise@keywordsentinel.ai
+                </a>
+              </div>
+            </CardContent>
+            <CardFooter className="flex gap-3">
+              <Button 
+                variant="outline" 
+                className="flex-1 border-slate-700 text-slate-300"
+                onClick={() => setShowEnterpriseModal(false)}
+              >
+                Close
+              </Button>
+              <Button 
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+                onClick={() => window.location.href = 'mailto:enterprise@keywordsentinel.ai'}
+              >
+                Email Sales
+              </Button>
+            </CardFooter>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }
@@ -254,7 +266,7 @@ function PricingContent() {
 export default function PricingPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-[#020617] flex items-center justify-center">
+      <div className="min-h-screen bg-[#0a0f1a] flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
       </div>
     }>

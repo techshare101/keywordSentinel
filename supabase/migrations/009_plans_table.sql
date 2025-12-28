@@ -20,14 +20,15 @@ CREATE TABLE IF NOT EXISTS plans (
 );
 
 -- Insert production plan metadata (AUTHORITATIVE - DO NOT CHANGE PRICE IDs)
+-- NO FREE TIER - All users must subscribe
 INSERT INTO plans (id, name, price_id, price_monthly, keyword_limit, scans_per_day,
   competitor_tracking, team_notifications, slack_alerts,
   digest_daily, digest_weekly, firecrawl_cap, api_access, white_label, team_members, priority_support)
 VALUES
-  ('free', 'Free', '', 0, 3, 2, FALSE, FALSE, FALSE, FALSE, FALSE, 0, FALSE, FALSE, 1, FALSE),
   ('starter', 'Starter', 'price_1SiY2cGRxp9eu0DJAJYpdXsJ', 19, 7, 15, FALSE, FALSE, FALSE, TRUE, FALSE, 10, FALSE, FALSE, 1, FALSE),
   ('pro', 'Pro', 'price_1SiY5EGRxp9eu0DJvWHdVl9N', 49, 15, 15, TRUE, TRUE, TRUE, TRUE, TRUE, 50, FALSE, FALSE, 3, TRUE),
-  ('business', 'Business', 'price_1Sj6eiGRxp9eu0DJbHRNt868', 99, 25, 48, TRUE, TRUE, TRUE, TRUE, TRUE, 200, TRUE, TRUE, 10, TRUE)
+  ('business', 'Business', 'price_1Sj6eiGRxp9eu0DJbHRNt868', 99, 25, 48, TRUE, TRUE, TRUE, TRUE, TRUE, 200, TRUE, TRUE, 10, TRUE),
+  ('enterprise', 'Enterprise', NULL, 0, 999, 999, TRUE, TRUE, TRUE, TRUE, TRUE, 999, TRUE, TRUE, 999, TRUE)
 ON CONFLICT (id) DO UPDATE SET
   name = EXCLUDED.name,
   price_id = EXCLUDED.price_id,

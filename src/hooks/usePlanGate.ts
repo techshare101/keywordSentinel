@@ -42,7 +42,7 @@ const UPGRADE_SUGGESTIONS: Record<string, PlanId> = {
 }
 
 export function usePlanGate(): PlanGateResult {
-  const [userPlan, setUserPlan] = useState<PlanId>('free')
+  const [userPlan, setUserPlan] = useState<PlanId>('starter')
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
 
@@ -50,7 +50,7 @@ export function usePlanGate(): PlanGateResult {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
-        setUserPlan('free')
+        setUserPlan('starter')
         setLoading(false)
         return
       }
@@ -64,11 +64,12 @@ export function usePlanGate(): PlanGateResult {
       if (profile?.plan && PLANS[profile.plan as PlanId]) {
         setUserPlan(profile.plan as PlanId)
       } else {
-        setUserPlan('free')
+        // Default to starter if no plan set (no free tier)
+        setUserPlan('starter')
       }
     } catch (error) {
       console.error('Error fetching user plan:', error)
-      setUserPlan('free')
+      setUserPlan('starter')
     } finally {
       setLoading(false)
     }

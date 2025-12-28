@@ -27,7 +27,7 @@ export function UpgradeModal({
   onOpenChange,
   reason,
   suggestedPlan = 'pro',
-  currentPlan = 'free',
+  currentPlan = 'starter',
 }: UpgradeModalProps) {
   const [loading, setLoading] = useState(false)
   const router = useRouter()

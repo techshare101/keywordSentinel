@@ -15,7 +15,7 @@ import { getPlanById, PLANS, type PlanId } from '@/lib/plans'
 import { Crown, Zap, Sparkles, ChevronRight } from 'lucide-react'
 
 export function PlanUsageBadge() {
-  const [plan, setPlan] = useState<PlanId>('free')
+  const [plan, setPlan] = useState<PlanId>('starter')
   const [keywordCount, setKeywordCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
@@ -37,8 +37,11 @@ export function PlanUsageBadge() {
       supabase.from('keywords').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
     ])
 
-    if (profileRes.data?.plan) {
+    if (profileRes.data?.plan && PLANS[profileRes.data.plan as PlanId]) {
       setPlan(profileRes.data.plan as PlanId)
+    } else {
+      // Default to starter (no free tier)
+      setPlan('starter')
     }
     if (keywordsRes.count !== null) {
       setKeywordCount(keywordsRes.count)
