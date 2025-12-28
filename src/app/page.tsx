@@ -58,30 +58,30 @@ const sources = [
 
 const pricing = [
   {
-    name: 'Free',
-    price: '$0',
-    period: 'forever',
-    description: 'Perfect for getting started',
-    features: ['3 keywords', '1-hour scan interval', 'Email alerts', 'Basic AI summaries'],
-    cta: 'Get Started',
+    name: 'Starter',
+    price: '$19',
+    period: '/month',
+    description: 'For solo founders getting started',
+    features: ['7 keywords', '15 scans per day', 'Email alerts', 'Daily digest', '🔥 Hot Lead detection', 'Basic AI summaries'],
+    cta: 'Start 7-Day Trial',
     popular: false,
   },
   {
     name: 'Pro',
-    price: '$19',
+    price: '$49',
     period: '/month',
     description: 'For serious monitoring',
-    features: ['50 keywords', '15-minute scans', 'Slack & Discord alerts', 'Advanced AI insights', 'Lead scoring', 'Priority support'],
+    features: ['15 keywords', '15-minute scans', 'Slack & Discord alerts', 'Competitor tracking', 'Advanced lead scoring', 'Priority support'],
     cta: 'Start Pro Trial',
     popular: true,
   },
   {
-    name: 'Team',
-    price: '$49',
+    name: 'Business',
+    price: '$99',
     period: '/month',
     description: 'For teams and agencies',
-    features: ['200 keywords', '5-minute scans', 'All alert channels', 'Team access', 'Export reports', 'API access', 'White-label options'],
-    cta: 'Contact Sales',
+    features: ['25 keywords', '5-minute scans', 'All alert channels', 'Team access (10 seats)', 'API & Webhooks', 'White-label reports'],
+    cta: 'Start Business Trial',
     popular: false,
   },
 ]
@@ -166,23 +166,25 @@ export default function LandingPage() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
             <Link href="/signup">
               <Button size="lg" className="bg-emerald-600 hover:bg-emerald-700 text-white text-lg px-8 h-14">
-                Start Monitoring Free
+                Start 7-Day Free Trial
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
-            <Button size="lg" variant="outline" className="border-slate-700 text-slate-300 hover:bg-slate-800 text-lg px-8 h-14">
-              Watch Demo
-            </Button>
+            <Link href="/pricing">
+              <Button size="lg" variant="outline" className="border-slate-700 text-slate-300 hover:bg-slate-800 text-lg px-8 h-14">
+                View Pricing
+              </Button>
+            </Link>
           </div>
           
           <div className="flex items-center justify-center gap-6 text-sm text-slate-500">
             <div className="flex items-center gap-2">
               <CheckCircle className="h-4 w-4 text-emerald-500" />
-              No credit card required
+              7-day free trial
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle className="h-4 w-4 text-emerald-500" />
-              3 keywords free forever
+              Cancel anytime
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle className="h-4 w-4 text-emerald-500" />
@@ -288,7 +290,7 @@ export default function LandingPage() {
               Simple, Transparent Pricing
             </h2>
             <p className="text-lg text-slate-400">
-              Start free. Upgrade when you need more power.
+              Start with a 7-day free trial. No credit card required.
             </p>
           </div>
           
@@ -375,11 +377,11 @@ export default function LandingPage() {
             Ready to Never Miss a Mention?
           </h2>
           <p className="text-lg text-slate-400 mb-8">
-            Join hundreds of founders and teams who use KeywordSentinel to stay ahead.
+            Join hundreds of founders and teams who use KeywordSentinel to catch buyers before competitors do.
           </p>
           <Link href="/signup">
             <Button size="lg" className="bg-emerald-600 hover:bg-emerald-700 text-white text-lg px-8 h-14">
-              Start Monitoring Free
+              Start Your 7-Day Trial
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
           </Link>
