@@ -179,6 +179,82 @@ export async function sendDiscordAlert(
   }
 }
 
+/**
+ * Send activation email when user subscribes to a paid plan
+ * "Your monitoring is now live" email
+ */
+export async function sendActivationEmail(
+  email: string,
+  planName: string,
+  keywordLimit: number
+): Promise<boolean> {
+  try {
+    const { error } = await resend.emails.send({
+      from: 'KeywordSentinel <hello@keywordsentinel.ai>',
+      to: email,
+      subject: '🚀 Your monitoring is now live!',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; padding: 20px;">
+          <div style="max-width: 600px; margin: 0 auto;">
+            <div style="text-align: center; margin-bottom: 30px;">
+              <h1 style="color: #10b981; margin: 0;">🎉 Welcome to ${planName}!</h1>
+              <p style="color: #94a3b8; font-size: 18px;">Your keyword monitoring is now active</p>
+            </div>
+            
+            <div style="background: #1e293b; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+              <h2 style="color: #10b981; margin-top: 0;">What's unlocked:</h2>
+              <ul style="color: #e2e8f0; line-height: 1.8;">
+                <li>✅ <strong>${keywordLimit} keywords</strong> to monitor</li>
+                <li>✅ Real-time scanning across Reddit, HN, Product Hunt & more</li>
+                <li>✅ AI-powered lead scoring & summaries</li>
+                <li>✅ Instant alerts via email, Slack, or Discord</li>
+                ${planName !== 'Starter' ? '<li>✅ Competitor tracking & advanced insights</li>' : ''}
+              </ul>
+            </div>
+            
+            <div style="background: linear-gradient(135deg, #10b981 0%, #0ea5e9 100%); border-radius: 12px; padding: 24px; text-align: center; margin-bottom: 24px;">
+              <h3 style="color: white; margin-top: 0;">🔥 Get Started Now</h3>
+              <p style="color: rgba(255,255,255,0.9); margin-bottom: 20px;">
+                Add your first keywords and start catching buyer intent signals.
+              </p>
+              <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard/keywords" 
+                 style="background: white; color: #0f172a; padding: 14px 28px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: 600;">
+                Add Keywords →
+              </a>
+            </div>
+            
+            <div style="text-align: center; color: #64748b; font-size: 14px;">
+              <p>Need help? Reply to this email or check our <a href="${process.env.NEXT_PUBLIC_APP_URL}/docs" style="color: #60a5fa;">documentation</a>.</p>
+              <p style="margin-top: 20px;">
+                Happy monitoring! 🎯<br>
+                <strong>The KeywordSentinel Team</strong>
+              </p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+    })
+
+    if (error) {
+      console.error('[Activation Email] Send error:', error)
+      return false
+    }
+
+    console.log(`[Activation Email] Sent to ${email} for ${planName} plan`)
+    return true
+  } catch (error) {
+    console.error('[Activation Email] Error:', error)
+    return false
+  }
+}
+
 function getSentimentColor(sentiment: string | null): string {
   switch (sentiment) {
     case 'positive':

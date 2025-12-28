@@ -253,8 +253,9 @@ async function recordAlerts(
 const DELAY_BETWEEN_KEYWORDS_MS = 5000
 
 /**
- * Full scan - scans ALL active keywords for ALL users
- * Prioritizes pro/team users first, then free users
+ * Full scan - scans ALL active keywords for PAID users only
+ * Free/trial users can see existing data but no new scans run for them
+ * Prioritizes business > pro > starter users
  */
 export async function runFullScan(): Promise<{ 
   usersScanned: number
@@ -262,28 +263,40 @@ export async function runFullScan(): Promise<{
   keywordsScanned: number
   duration: string
   errors: string[]
+  skippedFreeUsers: number
 }> {
   const scanStartTime = Date.now()
   const errors: string[] = []
   let totalMatches = 0
   let keywordsScanned = 0
+  let skippedFreeUsers = 0
 
-  console.log('[FullScan] Starting full scan of all users and keywords...')
+  console.log('[FullScan] Starting full scan of PAID users only...')
 
-  // Get all users, prioritize pro/team users
+  // Get all users with active subscriptions (paid plans only)
+  // Free users are skipped - they can see existing data but no new scans
   const { data: users } = await supabase
     .from('users')
-    .select('id, plan, email')
-    .order('plan', { ascending: false }) // pro/team first
+    .select('id, plan, email, subscription_status')
+    .in('plan', ['starter', 'pro', 'business', 'enterprise'])
+    .order('plan', { ascending: false }) // business/enterprise first
+
+  // Also get free users count for logging
+  const { count: freeCount } = await supabase
+    .from('users')
+    .select('id', { count: 'exact', head: true })
+    .or('plan.eq.free,plan.is.null')
+
+  skippedFreeUsers = freeCount || 0
 
   if (!users?.length) {
-    console.log('[FullScan] No users found')
-    return { usersScanned: 0, totalMatches: 0, keywordsScanned: 0, duration: '0s', errors: [] }
+    console.log(`[FullScan] No paid users found (${skippedFreeUsers} free users skipped)`)
+    return { usersScanned: 0, totalMatches: 0, keywordsScanned: 0, duration: '0s', errors: [], skippedFreeUsers }
   }
 
-  console.log(`[FullScan] Found ${users.length} users to scan`)
+  console.log(`[FullScan] Found ${users.length} paid users to scan (${skippedFreeUsers} free users skipped)`)
 
-  // Process each user
+  // Process each paid user
   for (const user of users) {
     const userStartTime = Date.now()
     
@@ -371,6 +384,7 @@ export async function runFullScan(): Promise<{
     totalMatches, 
     keywordsScanned,
     duration,
-    errors
+    errors,
+    skippedFreeUsers
   }
 }

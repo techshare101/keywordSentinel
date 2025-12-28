@@ -4,6 +4,7 @@ import { Sidebar } from '@/components/dashboard/sidebar'
 import { Header } from '@/components/dashboard/header'
 import { CommandPalette } from '@/components/command-palette'
 import { OnboardingTour } from '@/components/onboarding-tour'
+import { TrialCountdownBanner } from '@/components/dashboard/trial-countdown-banner'
 
 export default async function DashboardLayout({
   children,
@@ -32,6 +33,7 @@ export default async function DashboardLayout({
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header user={{ email: user.email!, full_name: profile?.full_name }} />
         <main className="flex-1 overflow-y-auto p-4 lg:p-6">
+          <TrialCountdownBanner />
           {children}
         </main>
       </div>

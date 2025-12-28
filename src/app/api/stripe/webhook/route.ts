@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { getStripe } from '@/lib/stripe'
 import { createClient } from '@supabase/supabase-js'
 import { PLANS, getPriceIdToPlan } from '@/lib/plans'
+import { sendActivationEmail } from '@/lib/services/alerts'
 import Stripe from 'stripe'
 
 export const dynamic = 'force-dynamic'
@@ -19,12 +20,14 @@ function getPlanFromPriceId(priceId: string) {
   if (!plan) {
     return {
       id: 'free',
+      name: 'Free',
       keywordsLimit: 3,
       scanInterval: 60,
     }
   }
   return {
     id: plan.id,
+    name: plan.name,
     keywordsLimit: plan.keywords,
     scanInterval: plan.scanInterval,
   }
@@ -78,8 +81,15 @@ export async function POST(request: Request) {
 
           console.log(`[Stripe Webhook] Checkout complete: user=${userId}, plan=${planInfo.id}`)
 
-          // Update user subscription
-          await getSupabaseAdmin()
+          // Get user email for activation email
+          const { data: userData } = await getSupabaseAdmin()
+            .from('users')
+            .select('email')
+            .eq('id', userId)
+            .single()
+
+          // INSTANT UPDATE: Update user subscription immediately
+          const { error: updateError } = await getSupabaseAdmin()
             .from('users')
             .update({
               stripe_customer_id: session.customer as string,
@@ -88,8 +98,24 @@ export async function POST(request: Request) {
               plan: planInfo.id,
               keywords_limit: planInfo.keywordsLimit,
               scan_interval_minutes: planInfo.scanInterval,
+              plan_updated_at: new Date().toISOString(),
             })
             .eq('id', userId)
+
+          if (updateError) {
+            console.error('[Stripe Webhook] Failed to update user:', updateError)
+          } else {
+            console.log(`[Stripe Webhook] ✅ User ${userId} upgraded to ${planInfo.name} (${planInfo.keywordsLimit} keywords)`)
+            
+            // Send activation email: "Your monitoring is now live!"
+            if (userData?.email) {
+              await sendActivationEmail(
+                userData.email,
+                planInfo.name,
+                planInfo.keywordsLimit
+              )
+            }
+          }
         }
         break
       }
