@@ -60,12 +60,13 @@ export async function scanKeywordsForUser(userId: string): Promise<ScanResult[]>
   // Get user profile for plan and limit info
   const { data: profile } = await supabase
     .from('users')
-    .select('plan, email')
+    .select('plan, email, subscription_status')
     .eq('id', userId)
     .single()
 
   const userPlan = profile?.plan || 'free'
   const userEmail = profile?.email
+  const subscriptionStatus = profile?.subscription_status || null
 
   // Get user settings
   const { data: settings } = await supabase
@@ -77,7 +78,7 @@ export async function scanKeywordsForUser(userId: string): Promise<ScanResult[]>
   let totalMatches = 0
   for (const keyword of keywords) {
     try {
-      const result = await scanKeyword(keyword, settings, userEmail, userPlan)
+      const result = await scanKeyword(keyword, settings, userEmail, userPlan, subscriptionStatus)
       results.push(result)
       totalMatches += result.matchesFound
     } catch (err) {
@@ -98,11 +99,48 @@ export async function scanKeywordsForUser(userId: string): Promise<ScanResult[]>
   return results
 }
 
+// Trial alert limits
+const TRIAL_SLACK_DISCORD_LIMIT_PER_DAY = 10
+
+async function getTrialAlertCountToday(userId: string, channel: 'slack' | 'discord'): Promise<number> {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  
+  const { count } = await supabase
+    .from('alerts')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('channel', channel)
+    .gte('sent_at', today.toISOString())
+  
+  return count || 0
+}
+
+async function canSendTrialAlert(
+  userId: string, 
+  channel: 'slack' | 'discord',
+  subscriptionStatus: string | null
+): Promise<{ allowed: boolean; remaining: number }> {
+  // Paid users have unlimited alerts
+  if (subscriptionStatus === 'active') {
+    return { allowed: true, remaining: Infinity }
+  }
+  
+  const countToday = await getTrialAlertCountToday(userId, channel)
+  const remaining = Math.max(0, TRIAL_SLACK_DISCORD_LIMIT_PER_DAY - countToday)
+  
+  return {
+    allowed: countToday < TRIAL_SLACK_DISCORD_LIMIT_PER_DAY,
+    remaining
+  }
+}
+
 async function scanKeyword(
   keyword: Keyword,
   settings: UserSettings | null,
   userEmail: string | undefined,
-  plan: string = 'free'
+  plan: string = 'free',
+  subscriptionStatus: string | null = null
 ): Promise<ScanResult> {
   const result: ScanResult = {
     userId: keyword.user_id,
@@ -208,22 +246,35 @@ async function scanKeyword(
 
     // Send alerts if enabled
     if (newMatches.length > 0 && settings) {
+      // Email alerts - UNLIMITED for all users (trial + paid)
       if (settings.email_alerts && userEmail) {
         const sent = await sendEmailAlert(userEmail, newMatches)
         if (sent) await recordAlerts(newMatches, keyword.user_id, 'email', sent)
         result.alertsSent++
       }
 
+      // Slack alerts - LIMITED for trial users (10/day), unlimited for paid
       if (settings.slack_webhook) {
-        const sent = await sendSlackAlert(settings.slack_webhook, newMatches)
-        if (sent) await recordAlerts(newMatches, keyword.user_id, 'slack', sent)
-        result.alertsSent++
+        const slackCheck = await canSendTrialAlert(keyword.user_id, 'slack', subscriptionStatus)
+        if (slackCheck.allowed) {
+          const sent = await sendSlackAlert(settings.slack_webhook, newMatches)
+          if (sent) await recordAlerts(newMatches, keyword.user_id, 'slack', sent)
+          result.alertsSent++
+        } else {
+          console.log(`[Scanner] Slack alert limit reached for trial user ${keyword.user_id} (${slackCheck.remaining} remaining)`)
+        }
       }
 
+      // Discord alerts - LIMITED for trial users (10/day), unlimited for paid
       if (settings.discord_webhook) {
-        const sent = await sendDiscordAlert(settings.discord_webhook, newMatches)
-        if (sent) await recordAlerts(newMatches, keyword.user_id, 'discord', sent)
-        result.alertsSent++
+        const discordCheck = await canSendTrialAlert(keyword.user_id, 'discord', subscriptionStatus)
+        if (discordCheck.allowed) {
+          const sent = await sendDiscordAlert(settings.discord_webhook, newMatches)
+          if (sent) await recordAlerts(newMatches, keyword.user_id, 'discord', sent)
+          result.alertsSent++
+        } else {
+          console.log(`[Scanner] Discord alert limit reached for trial user ${keyword.user_id} (${discordCheck.remaining} remaining)`)
+        }
       }
     }
   } catch (error) {
@@ -334,7 +385,7 @@ export async function runFullScan(): Promise<{
       // Scan each keyword for this user
       for (const keyword of keywords) {
         try {
-          const result = await scanKeyword(keyword, settings, user.email, user.plan)
+          const result = await scanKeyword(keyword, settings, user.email, user.plan, user.subscription_status)
           userMatches += result.matchesFound
           keywordsScanned++
 
