@@ -13,6 +13,14 @@ export async function sendEmailAlert(
 ): Promise<boolean> {
   if (matches.length === 0) return true
 
+  // Check if Resend API key is configured
+  if (!process.env.RESEND_API_KEY) {
+    console.error('[Email Alert] RESEND_API_KEY not configured')
+    return false
+  }
+
+  console.log(`[Email Alert] Sending ${matches.length} matches to ${email}`)
+
   try {
     const matchList = matches
       .map(
@@ -86,13 +94,14 @@ export async function sendEmailAlert(
     })
 
     if (error) {
-      console.error('Email send error:', error)
+      console.error('[Email Alert] Resend error:', error)
       return false
     }
 
+    console.log(`[Email Alert] ✅ Successfully sent to ${email}`)
     return true
   } catch (error) {
-    console.error('Email alert error:', error)
+    console.error('[Email Alert] Exception:', error)
     return false
   }
 }

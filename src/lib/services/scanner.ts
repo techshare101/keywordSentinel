@@ -246,11 +246,17 @@ async function scanKeyword(
 
     // Send alerts if enabled
     if (newMatches.length > 0 && settings) {
+      console.log(`[Scanner] Checking alerts for ${newMatches.length} new matches. email_alerts=${settings.email_alerts}, userEmail=${userEmail}`)
+      
       // Email alerts - UNLIMITED for all users (trial + paid)
       if (settings.email_alerts && userEmail) {
+        console.log(`[Scanner] Triggering email alert to ${userEmail}`)
         const sent = await sendEmailAlert(userEmail, newMatches)
+        console.log(`[Scanner] Email alert result: ${sent ? 'SUCCESS' : 'FAILED'}`)
         if (sent) await recordAlerts(newMatches, keyword.user_id, 'email', sent)
         result.alertsSent++
+      } else {
+        console.log(`[Scanner] Email alerts skipped: email_alerts=${settings.email_alerts}, userEmail=${userEmail || 'NOT SET'}`)
       }
 
       // Slack alerts - LIMITED for trial users (10/day), unlimited for paid
