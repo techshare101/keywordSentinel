@@ -8,10 +8,25 @@ import { sendAllWeeklyDigests } from '@/lib/services/digest'
 /**
  * CRON endpoint for sending email digests
  * 
+ * PRODUCTION ONLY - This endpoint should only run on production Vercel deployment
+ * 
  * Schedule: Weekly on Mondays at 9am (configured in vercel.json)
  * Can also be triggered manually for testing
  */
 export async function GET(req: Request) {
+  // Environment check - only run in production
+  const isProduction = process.env.VERCEL_ENV === 'production' || process.env.NODE_ENV === 'production'
+  
+  if (!isProduction && !process.env.ALLOW_DEV_CRON) {
+    console.log('[DIGEST CRON] Skipping - not in production environment')
+    return NextResponse.json({ 
+      ok: false, 
+      skipped: true,
+      reason: 'CRON jobs only run in production',
+      env: process.env.VERCEL_ENV || process.env.NODE_ENV
+    })
+  }
+
   const authHeader = req.headers.get('authorization') ?? req.headers.get('Authorization')
   const cronSecretHeader = req.headers.get('x-cron-secret')
   

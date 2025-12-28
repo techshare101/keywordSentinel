@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { getPlanById, PLANS } from '@/lib/plans'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,6 +13,17 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  // Get user's plan info
+  const { data: profile } = await supabase
+    .from('users')
+    .select('plan, keywords_limit')
+    .eq('id', user.id)
+    .single()
+
+  const userPlan = profile?.plan || 'free'
+  const planData = getPlanById(userPlan)
+  const keywordLimit = profile?.keywords_limit || planData?.keywords || 3
+
   const { data, error } = await supabase
     .from('keywords')
     .select('*')
@@ -22,7 +34,15 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  return NextResponse.json(data)
+  // Return keywords with usage info
+  return NextResponse.json({
+    keywords: data,
+    usage: {
+      current: data?.length || 0,
+      limit: keywordLimit,
+      plan: userPlan,
+    }
+  })
 }
 
 export async function POST(request: Request) {
@@ -41,21 +61,44 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Keyword is required' }, { status: 400 })
   }
 
-  // Check user's keyword limit
+  // Get user's plan and keyword limit
   const { data: profile } = await supabase
     .from('users')
-    .select('keywords_limit')
+    .select('plan, keywords_limit')
     .eq('id', user.id)
     .single()
+
+  const userPlan = profile?.plan || 'free'
+  const planData = getPlanById(userPlan)
+  const keywordLimit = profile?.keywords_limit || planData?.keywords || 3
 
   const { count } = await supabase
     .from('keywords')
     .select('*', { count: 'exact', head: true })
     .eq('user_id', user.id)
 
-  if (count && profile && count >= profile.keywords_limit) {
+  if (count !== null && count >= keywordLimit) {
+    // Determine upgrade suggestion
+    let suggestedPlan = 'starter'
+    if (userPlan === 'starter') suggestedPlan = 'pro'
+    else if (userPlan === 'pro') suggestedPlan = 'business'
+    else if (userPlan === 'business') suggestedPlan = 'enterprise'
+
+    const nextPlanData = getPlanById(suggestedPlan)
+    
     return NextResponse.json(
-      { error: 'Keyword limit reached. Upgrade to add more.' },
+      { 
+        error: 'Keyword limit reached',
+        code: 'KEYWORD_LIMIT_REACHED',
+        current: count,
+        limit: keywordLimit,
+        plan: userPlan,
+        upgrade: {
+          plan: suggestedPlan,
+          limit: nextPlanData?.keywords || 'unlimited',
+          price: nextPlanData?.price || 'custom',
+        }
+      },
       { status: 403 }
     )
   }

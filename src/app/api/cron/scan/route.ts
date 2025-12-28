@@ -9,10 +9,25 @@ import { runFullScan } from '@/lib/services/scanner'
  * Vercel CRON endpoint for automated scans
  * Runs every 30 minutes (configured in vercel.json)
  * 
+ * PRODUCTION ONLY - This endpoint should only run on production Vercel deployment
+ * 
  * Authentication: Vercel automatically adds Authorization header
  * Fallback: Also accepts CRON_SECRET_KEY for manual testing
  */
 export async function GET(req: Request) {
+  // Environment check - only run in production
+  const isProduction = process.env.VERCEL_ENV === 'production' || process.env.NODE_ENV === 'production'
+  
+  if (!isProduction && !process.env.ALLOW_DEV_CRON) {
+    console.log('[CRON] Skipping scan - not in production environment')
+    return NextResponse.json({ 
+      ok: false, 
+      skipped: true,
+      reason: 'CRON jobs only run in production',
+      env: process.env.VERCEL_ENV || process.env.NODE_ENV
+    })
+  }
+
   const authHeader = req.headers.get('authorization') ?? req.headers.get('Authorization')
   const cronSecretHeader = req.headers.get('x-cron-secret')
   

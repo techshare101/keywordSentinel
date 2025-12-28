@@ -29,7 +29,7 @@ export const PLANS = {
   starter: {
     id: 'starter',
     name: 'Starter',
-    price: 29,
+    price: 19,
     priceId: 'price_1SiY2cGRxp9eu0DJAJYpdXsJ',
     keywords: 7,
     scansPerDay: 15,
@@ -56,7 +56,7 @@ export const PLANS = {
   pro: {
     id: 'pro',
     name: 'Pro',
-    price: 79,
+    price: 49,
     priceId: 'price_1SiY5EGRxp9eu0DJvWHdVl9N',
     keywords: 15,
     scansPerDay: 15,
@@ -86,7 +86,7 @@ export const PLANS = {
   business: {
     id: 'business',
     name: 'Business',
-    price: 199,
+    price: 99,
     priceId: 'price_1Sj6eiGRxp9eu0DJbHRNt868',
     keywords: 25,
     scansPerDay: 48,

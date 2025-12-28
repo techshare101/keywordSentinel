@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -26,8 +27,11 @@ import {
   Minus,
   ExternalLink,
   Eye,
+  Lock,
+  Crown,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { usePlanGate } from '@/hooks/usePlanGate'
 import type { Keyword, Match } from '@/types/database'
 
 interface CompetitorData {
@@ -49,6 +53,10 @@ export default function CompetitorsPage() {
   const [adding, setAdding] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const supabase = createClient()
+  const router = useRouter()
+  const { isAllowed, userPlan, loading: planLoading } = usePlanGate()
+  
+  const hasCompetitorAccess = isAllowed('competitorTracking')
 
   useEffect(() => {
     fetchCompetitors()
@@ -224,10 +232,61 @@ export default function CompetitorsPage() {
     )
   }
 
-  if (loading) {
+  if (loading || planLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
+      </div>
+    )
+  }
+
+  // Feature gate: Competitor tracking requires Pro or Business plan
+  if (!hasCompetitorAccess) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Competitor Watchlist</h1>
+          <p className="text-slate-400">
+            Track competitor mentions and sentiment across the web.
+          </p>
+        </div>
+        
+        <Card className="border-slate-800 bg-gradient-to-br from-slate-900 to-slate-800">
+          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="rounded-full bg-amber-500/10 p-4 mb-4">
+              <Lock className="h-8 w-8 text-amber-400" />
+            </div>
+            <Badge className="mb-4 bg-amber-500/20 text-amber-400 border-amber-500/30">
+              Pro Feature
+            </Badge>
+            <h3 className="text-xl font-bold text-white mb-2">
+              Unlock Competitor Tracking
+            </h3>
+            <p className="text-slate-400 mb-6 max-w-md">
+              Monitor your competitors' mentions, track their sentiment trends, and stay ahead of the market. 
+              Available on Pro ($49/mo) and Business ($99/mo) plans.
+            </p>
+            <div className="flex gap-3">
+              <Button
+                onClick={() => router.push('/pricing?highlight=pro')}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                <Crown className="mr-2 h-4 w-4" />
+                Upgrade to Pro
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => router.push('/pricing')}
+                className="border-slate-700 text-slate-300 hover:bg-slate-800"
+              >
+                Compare Plans
+              </Button>
+            </div>
+            <p className="text-xs text-slate-500 mt-4">
+              Current plan: <span className="text-slate-400 capitalize">{userPlan}</span>
+            </p>
+          </CardContent>
+        </Card>
       </div>
     )
   }
