@@ -156,6 +156,7 @@ export type Database = {
         Row: {
           id: string
           user_id: string
+          team_id: string | null
           email_alerts: boolean
           slack_webhook: string | null
           discord_webhook: string | null
@@ -166,6 +167,7 @@ export type Database = {
         Insert: {
           id?: string
           user_id: string
+          team_id?: string | null
           email_alerts?: boolean
           slack_webhook?: string | null
           discord_webhook?: string | null
@@ -176,6 +178,7 @@ export type Database = {
         Update: {
           id?: string
           user_id?: string
+          team_id?: string | null
           email_alerts?: boolean
           slack_webhook?: string | null
           discord_webhook?: string | null
@@ -184,16 +187,71 @@ export type Database = {
           updated_at?: string
         }
       }
+      teams: {
+        Row: {
+          id: string
+          owner_id: string
+          name: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          owner_id: string
+          name: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          owner_id?: string
+          name?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      team_members: {
+        Row: {
+          id: string
+          team_id: string
+          user_id: string
+          role: 'owner' | 'admin' | 'member'
+          invited_by: string | null
+          invited_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          team_id: string
+          user_id: string
+          role?: 'owner' | 'admin' | 'member'
+          invited_by?: string | null
+          invited_at?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          team_id?: string
+          user_id?: string
+          role?: 'owner' | 'admin' | 'member'
+          invited_by?: string | null
+          invited_at?: string
+          created_at?: string
+        }
+      }
     }
   }
 }
 
-export type User = Database['public']['Tables']['users']['Row']
-export type Keyword = Database['public']['Tables']['keywords']['Row']
-export type Match = Database['public']['Tables']['matches']['Row']
-export type Alert = Database['public']['Tables']['alerts']['Row']
+export type User = Database['public']['Tables']['users']['Row'] & { team_id?: string | null }
+export type Keyword = Database['public']['Tables']['keywords']['Row'] & { team_id?: string | null }
+export type Match = Database['public']['Tables']['matches']['Row'] & { team_id?: string | null }
+export type Alert = Database['public']['Tables']['alerts']['Row'] & { team_id?: string | null }
 export type UserSettings = Database['public']['Tables']['user_settings']['Row']
+export type Team = Database['public']['Tables']['teams']['Row']
+export type TeamMember = Database['public']['Tables']['team_members']['Row']
 
 export type SourceType = Match['source']
 export type SentimentType = Match['sentiment']
 export type PlanType = User['plan']
+export type TeamRole = TeamMember['role']

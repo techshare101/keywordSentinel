@@ -29,6 +29,7 @@ import {
 import { toast } from 'sonner'
 import type { UserSettings, User as UserType } from '@/types/database'
 import { FirecrawlUsage } from '@/components/dashboard/firecrawl-usage'
+import { TeamSettings } from '@/components/dashboard/team-settings'
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
@@ -364,6 +365,9 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Team Settings */}
+      <TeamSettings />
 
       {/* Firecrawl Usage - Only show for pro/team users */}
       {currentPlan !== 'free' && (
