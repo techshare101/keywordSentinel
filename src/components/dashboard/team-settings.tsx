@@ -116,11 +116,11 @@ export function TeamSettings() {
     setInviting(true)
 
     try {
-      // First check if user exists
+      // First check if user exists (case-insensitive)
       const { data: existingUser } = await supabase
         .from('users')
         .select('id')
-        .eq('email', inviteEmail.trim().toLowerCase())
+        .ilike('email', inviteEmail.trim())
         .single()
 
       if (!existingUser) {
