@@ -6,6 +6,7 @@ import { sendEmailAlert } from '@/lib/services/alerts'
 const FOUNDER_EMAILS = [
   'support@metalmindtech.com',
   'valentinv2000@gmail.com',
+  'valentin2v2000@gmail.com',
 ]
 
 // Create admin client for server-side operations

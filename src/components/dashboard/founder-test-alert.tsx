@@ -11,6 +11,7 @@ import { Loader2, Mail, Shield, Zap } from 'lucide-react'
 const FOUNDER_EMAILS = [
   'support@metalmindtech.com',
   'valentinv2000@gmail.com',
+  'valentin2v2000@gmail.com',
 ]
 
 interface FounderTestAlertProps {
