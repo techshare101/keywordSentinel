@@ -162,9 +162,9 @@ function PricingContent() {
                     ) : planId === 'starter' ? (
                       'Start 7-Day Free Trial'
                     ) : planId === 'pro' ? (
-                      'Upgrade to Pro'
+                      'Get Pro'
                     ) : (
-                      'Upgrade to Business'
+                      'Get Business'
                     )}
                   </Button>
                 </CardFooter>
