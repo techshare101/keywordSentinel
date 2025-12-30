@@ -21,8 +21,14 @@ export function FounderTestAlert({ userEmail }: FounderTestAlertProps) {
   const [sending, setSending] = useState(false)
   const supabase = createClient()
 
+  // Debug: log the email being checked
+  console.log('[FounderTestAlert] Checking email:', userEmail, 'against:', FOUNDER_EMAILS)
+
   // Only show for founders
-  if (!userEmail || !FOUNDER_EMAILS.includes(userEmail.toLowerCase())) {
+  const isFounder = userEmail && FOUNDER_EMAILS.some(e => e.toLowerCase() === userEmail.toLowerCase())
+  
+  if (!isFounder) {
+    console.log('[FounderTestAlert] Not a founder, hiding component')
     return null
   }
 
