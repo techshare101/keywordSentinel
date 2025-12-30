@@ -72,7 +72,7 @@ const pricing = [
     period: '/month',
     description: 'For serious monitoring',
     features: ['15 keywords', '15-minute scans', 'Slack & Discord alerts', 'Competitor tracking', 'Advanced lead scoring', 'Priority support'],
-    cta: 'Start Pro Trial',
+    cta: 'Get Pro',
     popular: true,
   },
   {
@@ -81,7 +81,7 @@ const pricing = [
     period: '/month',
     description: 'For teams and agencies',
     features: ['25 keywords', '5-minute scans', 'All alert channels', 'Team access (10 seats)', 'API & Webhooks', 'White-label reports'],
-    cta: 'Start Business Trial',
+    cta: 'Get Business',
     popular: false,
   },
 ]
