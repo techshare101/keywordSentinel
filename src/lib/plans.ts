@@ -192,15 +192,36 @@ export function isWithinLimit(userPlan: string, feature: 'keywords' | 'scansPerD
   return current < plan[feature]
 }
 
-// Get effective plan considering trial status
+// Get effective plan considering admin/tester roles and trial status
 export function getEffectivePlan(user: {
   plan?: string | null
   trial_ends_at?: string | null
   subscription_status?: string | null
-}): { plan: PlanId; daysLeft: number | null; isTrialing: boolean } {
+  role?: string | null
+}): { plan: PlanId; daysLeft: number | null; isTrialing: boolean; source: 'admin' | 'tester' | 'trial' | 'subscription' } {
   const now = new Date()
 
-  // Check if user is in active trial
+  // 1. Admin override - always gets business plan
+  if (user.role === 'admin') {
+    return {
+      plan: 'business',
+      daysLeft: null,
+      isTrialing: false,
+      source: 'admin',
+    }
+  }
+
+  // 2. Internal tester - gets business plan without billing
+  if (user.role === 'internal_tester') {
+    return {
+      plan: 'business',
+      daysLeft: null,
+      isTrialing: false,
+      source: 'tester',
+    }
+  }
+
+  // 3. Check if user is in active trial
   if (user.trial_ends_at) {
     const ends = new Date(user.trial_ends_at)
     if (ends > now && user.subscription_status !== 'active') {
@@ -209,15 +230,17 @@ export function getEffectivePlan(user: {
         plan: 'trial',
         daysLeft,
         isTrialing: true,
+        source: 'trial',
       }
     }
   }
 
-  // Not trialing - use actual plan
+  // 4. Paid subscription or default
   const plan = (user.plan as PlanId) || 'starter'
   return {
     plan: PLANS[plan] ? plan : 'starter',
     daysLeft: null,
     isTrialing: false,
+    source: 'subscription',
   }
 }

@@ -36,12 +36,20 @@ export async function POST(request: Request) {
       )
     }
 
-    // Get user's Stripe customer ID if exists
+    // Get user's Stripe customer ID and role
     const { data: profile } = await supabase
       .from('users')
-      .select('stripe_customer_id, email')
+      .select('stripe_customer_id, email, role')
       .eq('id', user.id)
       .single()
+
+    // Block admin/tester accounts from purchasing
+    if (profile?.role === 'admin' || profile?.role === 'internal_tester') {
+      return NextResponse.json(
+        { error: 'Internal accounts cannot purchase plans. You already have full access.' },
+        { status: 403 }
+      )
+    }
 
     let customerId = profile?.stripe_customer_id
 

@@ -45,6 +45,7 @@ function SidebarContent({
   userPlan, 
   daysLeft,
   isTrialing,
+  source,
   onSignOut,
   onNavigate 
 }: { 
@@ -52,6 +53,7 @@ function SidebarContent({
   userPlan: string
   daysLeft: number | null
   isTrialing: boolean
+  source: 'admin' | 'tester' | 'trial' | 'subscription'
   onSignOut: () => void
   onNavigate?: () => void
 }) {
@@ -87,7 +89,29 @@ function SidebarContent({
       </nav>
 
       <div className="border-t border-slate-800 p-4">
-        {isTrialing ? (
+        {source === 'admin' ? (
+          <div className="mb-4 rounded-lg bg-gradient-to-r from-purple-500/10 to-pink-500/10 p-4 border border-purple-500/20">
+            <div className="flex items-center gap-2 mb-2">
+              <Crown className="h-4 w-4 text-purple-400" />
+              <span className="text-sm font-medium text-white">Business Plan</span>
+              <Badge className="bg-purple-500 text-white text-xs">Admin</Badge>
+            </div>
+            <p className="text-xs text-slate-400">
+              {PLANS.business.keywords} keywords, {PLANS.business.scanInterval}-min scans
+            </p>
+          </div>
+        ) : source === 'tester' ? (
+          <div className="mb-4 rounded-lg bg-gradient-to-r from-blue-500/10 to-cyan-500/10 p-4 border border-blue-500/20">
+            <div className="flex items-center gap-2 mb-2">
+              <Crown className="h-4 w-4 text-blue-400" />
+              <span className="text-sm font-medium text-white">Business Plan</span>
+              <Badge className="bg-blue-500 text-white text-xs">Tester</Badge>
+            </div>
+            <p className="text-xs text-slate-400">
+              {PLANS.business.keywords} keywords, {PLANS.business.scanInterval}-min scans
+            </p>
+          </div>
+        ) : isTrialing ? (
           <div className="mb-4 rounded-lg bg-gradient-to-r from-amber-500/10 to-orange-500/10 p-4 border border-amber-500/20">
             <div className="flex items-center gap-2 mb-2">
               <Zap className="h-4 w-4 text-amber-400" />
@@ -154,6 +178,7 @@ export function Sidebar() {
   const [userPlan, setUserPlan] = useState<string>('free')
   const [daysLeft, setDaysLeft] = useState<number | null>(null)
   const [isTrialing, setIsTrialing] = useState(false)
+  const [source, setSource] = useState<'admin' | 'tester' | 'trial' | 'subscription'>('subscription')
   const [mobileOpen, setMobileOpen] = useState(false)
 
   useEffect(() => {
@@ -162,7 +187,7 @@ export function Sidebar() {
       if (user) {
         const { data } = await supabase
           .from('users')
-          .select('plan, trial_ends_at, subscription_status')
+          .select('plan, trial_ends_at, subscription_status, role')
           .eq('id', user.id)
           .single()
         if (data) {
@@ -170,6 +195,7 @@ export function Sidebar() {
           setUserPlan(effective.plan)
           setDaysLeft(effective.daysLeft)
           setIsTrialing(effective.isTrialing)
+          setSource(effective.source)
         }
       }
     }
@@ -193,6 +219,7 @@ export function Sidebar() {
               userPlan={userPlan}
               daysLeft={daysLeft}
               isTrialing={isTrialing}
+              source={source}
               onSignOut={handleSignOut}
               onNavigate={() => setMobileOpen(false)}
             />
@@ -207,6 +234,7 @@ export function Sidebar() {
           userPlan={userPlan}
           daysLeft={daysLeft}
           isTrialing={isTrialing}
+          source={source}
           onSignOut={handleSignOut}
         />
       </div>
@@ -222,6 +250,7 @@ export function MobileMenuButton() {
   const [userPlan, setUserPlan] = useState<string>('free')
   const [daysLeft, setDaysLeft] = useState<number | null>(null)
   const [isTrialing, setIsTrialing] = useState(false)
+  const [source, setSource] = useState<'admin' | 'tester' | 'trial' | 'subscription'>('subscription')
 
   useEffect(() => {
     const fetchUserPlan = async () => {
@@ -229,7 +258,7 @@ export function MobileMenuButton() {
       if (user) {
         const { data } = await supabase
           .from('users')
-          .select('plan, trial_ends_at, subscription_status')
+          .select('plan, trial_ends_at, subscription_status, role')
           .eq('id', user.id)
           .single()
         if (data) {
@@ -237,6 +266,7 @@ export function MobileMenuButton() {
           setUserPlan(effective.plan)
           setDaysLeft(effective.daysLeft)
           setIsTrialing(effective.isTrialing)
+          setSource(effective.source)
         }
       }
     }
@@ -263,6 +293,7 @@ export function MobileMenuButton() {
             userPlan={userPlan}
             daysLeft={daysLeft}
             isTrialing={isTrialing}
+            source={source}
             onSignOut={handleSignOut}
             onNavigate={() => setOpen(false)}
           />

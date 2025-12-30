@@ -45,11 +45,11 @@ export default function KeywordsPage() {
     if (user) {
       const { data } = await supabase
         .from('users')
-        .select('plan, trial_ends_at, subscription_status')
+        .select('plan, trial_ends_at, subscription_status, role')
         .eq('id', user.id)
         .single()
       if (data) {
-        // Use getEffectivePlan to handle trial logic
+        // Use getEffectivePlan to handle trial/admin/tester logic
         const { plan } = getEffectivePlan(data)
         setUserPlan(plan)
         // Use PLANS config as source of truth for limits
