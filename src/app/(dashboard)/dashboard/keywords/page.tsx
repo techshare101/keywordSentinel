@@ -23,6 +23,7 @@ import Link from 'next/link'
 import type { Keyword } from '@/types/database'
 import { KeywordSuggestions } from '@/components/dashboard/keyword-suggestions'
 import { BulkImport } from '@/components/dashboard/bulk-import'
+import { PLANS } from '@/lib/plans'
 
 export default function KeywordsPage() {
   const [keywords, setKeywords] = useState<Keyword[]>([])
@@ -44,12 +45,15 @@ export default function KeywordsPage() {
     if (user) {
       const { data } = await supabase
         .from('users')
-        .select('keywords_limit, plan')
+        .select('plan')
         .eq('id', user.id)
         .single()
       if (data) {
-        setKeywordLimit(data.keywords_limit)
-        setUserPlan(data.plan || 'free')
+        const plan = data.plan || 'starter'
+        setUserPlan(plan)
+        // Use PLANS config as source of truth for limits
+        const planConfig = PLANS[plan as keyof typeof PLANS]
+        setKeywordLimit(planConfig?.keywords || 7)
       }
     }
   }

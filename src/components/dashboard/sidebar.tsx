@@ -22,6 +22,7 @@ import {
   X,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { PLANS } from '@/lib/plans'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -105,7 +106,7 @@ function SidebarContent({
               <Badge className="bg-emerald-500 text-white text-xs">Active</Badge>
             </div>
             <p className="text-xs text-slate-400">
-              {userPlan === 'pro' ? '50 keywords, 15-min scans' : '200 keywords, 5-min scans'}
+              {PLANS[userPlan as keyof typeof PLANS]?.keywords || 15} keywords, {PLANS[userPlan as keyof typeof PLANS]?.scanInterval || 15}-min scans
             </p>
           </div>
         )}

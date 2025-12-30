@@ -30,7 +30,7 @@ export function ReplyGenerator({ matchId, title, content, source, url, userPlan 
   const [copied, setCopied] = useState(false)
   const [tone, setTone] = useState<'professional' | 'casual' | 'helpful'>('helpful')
 
-  const isPremium = userPlan === 'pro' || userPlan === 'team'
+  const isPremium = userPlan === 'pro' || userPlan === 'business' || userPlan === 'enterprise'
 
   const generateReply = async () => {
     if (!isPremium) return
