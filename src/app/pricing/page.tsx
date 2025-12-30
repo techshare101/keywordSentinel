@@ -159,8 +159,12 @@ function PricingContent() {
                   >
                     {loading === planId ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : planId === 'starter' ? (
+                      'Start 7-Day Free Trial'
+                    ) : planId === 'pro' ? (
+                      'Upgrade to Pro'
                     ) : (
-                      'Get Started'
+                      'Upgrade to Business'
                     )}
                   </Button>
                 </CardFooter>
