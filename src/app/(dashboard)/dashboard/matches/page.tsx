@@ -37,6 +37,7 @@ import { ReplyGenerator } from '@/components/dashboard/reply-generator'
 import { ExportButton } from '@/components/dashboard/export-button'
 import { BookmarkButton } from '@/components/dashboard/bookmark-button'
 import { MatchNotes } from '@/components/dashboard/match-notes'
+import { getEffectivePlan } from '@/lib/plans'
 
 interface MatchWithKeyword extends Match {
   keywords: { keyword: string }
@@ -63,11 +64,28 @@ export default function MatchesPage() {
   const [sourceFilter, setSourceFilter] = useState<string>('all')
   const [sentimentFilter, setSentimentFilter] = useState<string>('all')
   const [showBookmarked, setShowBookmarked] = useState(false)
+  const [userPlan, setUserPlan] = useState<string>('trial')
   const supabase = createClient()
 
   useEffect(() => {
     fetchMatches()
+    fetchUserPlan()
   }, [])
+
+  const fetchUserPlan = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const { data } = await supabase
+        .from('users')
+        .select('plan, trial_ends_at, subscription_status, role')
+        .eq('id', user.id)
+        .single()
+      if (data) {
+        const { plan } = getEffectivePlan(data)
+        setUserPlan(plan)
+      }
+    }
+  }
 
   const fetchMatches = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -310,6 +328,7 @@ export default function MatchesPage() {
                             content={match.content}
                             source={match.source}
                             url={match.url}
+                            userPlan={userPlan}
                           />
                           <a
                             href={match.url}
