@@ -30,6 +30,7 @@ import { toast } from 'sonner'
 import type { UserSettings, User as UserType } from '@/types/database'
 import { FirecrawlUsage } from '@/components/dashboard/firecrawl-usage'
 import { TeamSettings } from '@/components/dashboard/team-settings'
+import { FounderTestAlert } from '@/components/dashboard/founder-test-alert'
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
@@ -208,7 +209,10 @@ export default function SettingsPage() {
                 <Label className="text-slate-300">Email Alerts</Label>
               </div>
               <p className="text-sm text-slate-500">
-                Receive email notifications for new matches
+                You'll only receive emails for high-intent opportunities (Hot leads).
+              </p>
+              <p className="text-xs text-emerald-500/80">
+                This keeps alerts actionable and spam-free.
               </p>
             </div>
             <Switch
@@ -373,6 +377,9 @@ export default function SettingsPage() {
       {currentPlan !== 'free' && (
         <FirecrawlUsage />
       )}
+
+      {/* Founder-only test alert tool */}
+      <FounderTestAlert userEmail={profile?.email || null} />
     </div>
   )
 }

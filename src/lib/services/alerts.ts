@@ -83,10 +83,19 @@ export async function sendEmailAlert(
               </a>
             </div>
             
-            <p style="color: #64748b; font-size: 12px; text-align: center; margin-top: 30px;">
-              You're receiving this because you have keyword alerts enabled.<br>
-              <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard/settings" style="color: #60a5fa;">Manage your notification settings</a>
-            </p>
+            <!-- Why you received this email footer -->
+            <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #334155;">
+              <p style="color: #64748b; font-size: 12px; text-align: center; margin: 0 0 8px 0;">
+                <strong style="color: #94a3b8;">Why you received this email</strong>
+              </p>
+              <p style="color: #64748b; font-size: 12px; text-align: center; margin: 0 0 12px 0; line-height: 1.5;">
+                KeywordSentinel detected a high-intent conversation related to your tracked keywords.<br>
+                We only email you when an opportunity is likely worth acting on.
+              </p>
+              <p style="color: #64748b; font-size: 12px; text-align: center; margin: 0;">
+                <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard/settings" style="color: #60a5fa;">Manage alerts in your dashboard</a>
+              </p>
+            </div>
           </div>
         </body>
         </html>

@@ -248,13 +248,30 @@ async function scanKeyword(
     if (newMatches.length > 0 && settings) {
       console.log(`[Scanner] Checking alerts for ${newMatches.length} new matches. email_alerts=${settings.email_alerts}, userEmail=${userEmail}`)
       
-      // Email alerts - UNLIMITED for all users (trial + paid)
-      if (settings.email_alerts && userEmail) {
-        console.log(`[Scanner] Triggering email alert to ${userEmail}`)
-        const sent = await sendEmailAlert(userEmail, newMatches)
+      // Email alerts - HOT LEADS ONLY (score >= 70 + high-intent)
+      // This is the production-grade notification strategy:
+      // - Email is interruptive, use only for moments that matter
+      // - Warm/neutral leads appear in dashboard only
+      // - This protects deliverability, Resend costs, and user trust
+      const HOT_LEAD_INTENTS = ['buying', 'researching'] // High commercial intent
+      const hotLeads = newMatches.filter(m => {
+        const score = m.lead_score || 0
+        const intent = m.metadata?.intent || ''
+        const isHot = score >= 70 && HOT_LEAD_INTENTS.includes(intent)
+        if (!isHot) {
+          console.log(`[Scanner] Match "${m.title?.slice(0, 30)}..." not hot enough for email (score=${score}, intent=${intent})`)
+        }
+        return isHot
+      })
+      
+      if (settings.email_alerts && userEmail && hotLeads.length > 0) {
+        console.log(`[Scanner] Triggering email alert for ${hotLeads.length} HOT leads to ${userEmail}`)
+        const sent = await sendEmailAlert(userEmail, hotLeads)
         console.log(`[Scanner] Email alert result: ${sent ? 'SUCCESS' : 'FAILED'}`)
-        if (sent) await recordAlerts(newMatches, keyword.user_id, 'email', sent)
+        if (sent) await recordAlerts(hotLeads, keyword.user_id, 'email', sent)
         result.alertsSent++
+      } else if (settings.email_alerts && userEmail) {
+        console.log(`[Scanner] Email alerts skipped: no HOT leads (${newMatches.length} matches, 0 hot)`)
       } else {
         console.log(`[Scanner] Email alerts skipped: email_alerts=${settings.email_alerts}, userEmail=${userEmail || 'NOT SET'}`)
       }
