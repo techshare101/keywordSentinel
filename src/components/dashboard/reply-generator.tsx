@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog'
 import { MessageSquare, Loader2, Copy, Check, RefreshCw, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
+import { PLANS } from '@/lib/plans'
 
 interface ReplyGeneratorProps {
   matchId: string
@@ -30,7 +31,7 @@ export function ReplyGenerator({ matchId, title, content, source, url, userPlan 
   const [copied, setCopied] = useState(false)
   const [tone, setTone] = useState<'professional' | 'casual' | 'helpful'>('helpful')
 
-  const isPremium = userPlan === 'pro' || userPlan === 'business' || userPlan === 'enterprise'
+  const isPremium = PLANS[userPlan as keyof typeof PLANS]?.aiReply ?? false
 
   const generateReply = async () => {
     if (!isPremium) return

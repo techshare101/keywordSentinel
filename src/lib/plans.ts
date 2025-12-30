@@ -1,6 +1,37 @@
 // PRODUCTION PRICING - NO FREE TIER
 // Stripe Price IDs are LOCKED - DO NOT CHANGE
 export const PLANS = {
+  trial: {
+    id: 'trial',
+    name: 'Trial',
+    price: 0,
+    priceId: null,
+    description: '7-day free trial',
+    keywords: 3,
+    scansPerDay: 10,
+    scanInterval: 60,
+    competitorTracking: false,
+    teamNotifications: false,
+    slackAlerts: false,
+    discordAlerts: false,
+    digestDaily: true,
+    digestWeekly: false,
+    firecrawlCap: 5,
+    firecrawlManualOnly: true,
+    apiAccess: false,
+    whiteLabel: false,
+    teamMembers: 1,
+    prioritySupport: false,
+    advancedLeadScoring: false,
+    aiReply: false,
+    features: [
+      '3 keywords',
+      '10 scans per day',
+      'Email alerts',
+      'Daily digest',
+      '🔥 Hot Lead detection',
+    ],
+  },
   starter: {
     id: 'starter',
     name: 'Starter',
@@ -23,6 +54,7 @@ export const PLANS = {
     teamMembers: 1,
     prioritySupport: false,
     advancedLeadScoring: false,
+    aiReply: false,
     features: [
       '7 keywords',
       '15 scans per day',
@@ -55,6 +87,7 @@ export const PLANS = {
     teamMembers: 3,
     prioritySupport: true,
     advancedLeadScoring: true,
+    aiReply: true,
     features: [
       '15 keywords',
       '15-minute scans',
@@ -88,6 +121,7 @@ export const PLANS = {
     teamMembers: 10,
     prioritySupport: true,
     advancedLeadScoring: true,
+    aiReply: true,
     features: [
       '25 keywords',
       '5-minute scans',
@@ -121,6 +155,7 @@ export const PLANS = {
     teamMembers: 999,
     prioritySupport: true,
     advancedLeadScoring: true,
+    aiReply: true,
     features: [
       'Unlimited keywords',
       'Real-time scanning',
@@ -155,4 +190,34 @@ export function isWithinLimit(userPlan: string, feature: 'keywords' | 'scansPerD
   const plan = getPlanById(userPlan)
   if (!plan) return false
   return current < plan[feature]
+}
+
+// Get effective plan considering trial status
+export function getEffectivePlan(user: {
+  plan?: string | null
+  trial_ends_at?: string | null
+  subscription_status?: string | null
+}): { plan: PlanId; daysLeft: number | null; isTrialing: boolean } {
+  const now = new Date()
+
+  // Check if user is in active trial
+  if (user.trial_ends_at) {
+    const ends = new Date(user.trial_ends_at)
+    if (ends > now && user.subscription_status !== 'active') {
+      const daysLeft = Math.ceil((ends.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+      return {
+        plan: 'trial',
+        daysLeft,
+        isTrialing: true,
+      }
+    }
+  }
+
+  // Not trialing - use actual plan
+  const plan = (user.plan as PlanId) || 'starter'
+  return {
+    plan: PLANS[plan] ? plan : 'starter',
+    daysLeft: null,
+    isTrialing: false,
+  }
 }

@@ -22,7 +22,7 @@ import {
   X,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { PLANS } from '@/lib/plans'
+import { PLANS, getEffectivePlan } from '@/lib/plans'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -43,11 +43,15 @@ const navigation = [
 function SidebarContent({ 
   pathname, 
   userPlan, 
+  daysLeft,
+  isTrialing,
   onSignOut,
   onNavigate 
 }: { 
   pathname: string
   userPlan: string
+  daysLeft: number | null
+  isTrialing: boolean
   onSignOut: () => void
   onNavigate?: () => void
 }) {
@@ -83,18 +87,37 @@ function SidebarContent({
       </nav>
 
       <div className="border-t border-slate-800 p-4">
-        {userPlan === 'free' ? (
-          <div className="mb-4 rounded-lg bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 p-4">
+        {isTrialing ? (
+          <div className="mb-4 rounded-lg bg-gradient-to-r from-amber-500/10 to-orange-500/10 p-4 border border-amber-500/20">
             <div className="flex items-center gap-2 mb-2">
-              <Zap className="h-4 w-4 text-emerald-400" />
-              <span className="text-sm font-medium text-white">Upgrade to Pro</span>
+              <Zap className="h-4 w-4 text-amber-400" />
+              <span className="text-sm font-medium text-white">Free Trial</span>
+              <Badge className="bg-amber-500 text-white text-xs">
+                {daysLeft === 1 ? 'Ends tomorrow' : daysLeft === 0 ? 'Ends today' : `${daysLeft} days left`}
+              </Badge>
             </div>
             <p className="text-xs text-slate-400 mb-3">
-              Get 50 keywords, 15-min scans, and AI summaries.
+              {PLANS.trial.keywords} keywords, {PLANS.trial.scanInterval}-min scans
             </p>
             <Link href="/pricing" onClick={onNavigate}>
               <Button size="sm" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white">
                 Upgrade Now
+              </Button>
+            </Link>
+          </div>
+        ) : userPlan === 'free' || userPlan === 'starter' ? (
+          <div className="mb-4 rounded-lg bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Crown className="h-4 w-4 text-emerald-400" />
+              <span className="text-sm font-medium text-white capitalize">{userPlan === 'free' ? 'Starter' : userPlan} Plan</span>
+              <Badge className="bg-emerald-500 text-white text-xs">Active</Badge>
+            </div>
+            <p className="text-xs text-slate-400 mb-3">
+              {PLANS[userPlan as keyof typeof PLANS]?.keywords || 7} keywords, {PLANS[userPlan as keyof typeof PLANS]?.scanInterval || 30}-min scans
+            </p>
+            <Link href="/pricing" onClick={onNavigate}>
+              <Button size="sm" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white">
+                Upgrade to Pro
               </Button>
             </Link>
           </div>
@@ -129,6 +152,8 @@ export function Sidebar() {
   const router = useRouter()
   const supabase = createClient()
   const [userPlan, setUserPlan] = useState<string>('free')
+  const [daysLeft, setDaysLeft] = useState<number | null>(null)
+  const [isTrialing, setIsTrialing] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
 
   useEffect(() => {
@@ -137,11 +162,14 @@ export function Sidebar() {
       if (user) {
         const { data } = await supabase
           .from('users')
-          .select('plan')
+          .select('plan, trial_ends_at, subscription_status')
           .eq('id', user.id)
           .single()
-        if (data?.plan) {
-          setUserPlan(data.plan)
+        if (data) {
+          const effective = getEffectivePlan(data)
+          setUserPlan(effective.plan)
+          setDaysLeft(effective.daysLeft)
+          setIsTrialing(effective.isTrialing)
         }
       }
     }
@@ -162,7 +190,9 @@ export function Sidebar() {
           <div className="flex h-full flex-col">
             <SidebarContent 
               pathname={pathname} 
-              userPlan={userPlan} 
+              userPlan={userPlan}
+              daysLeft={daysLeft}
+              isTrialing={isTrialing}
               onSignOut={handleSignOut}
               onNavigate={() => setMobileOpen(false)}
             />
@@ -174,7 +204,9 @@ export function Sidebar() {
       <div className="hidden lg:flex h-full w-64 flex-col bg-slate-900 border-r border-slate-800">
         <SidebarContent 
           pathname={pathname} 
-          userPlan={userPlan} 
+          userPlan={userPlan}
+          daysLeft={daysLeft}
+          isTrialing={isTrialing}
           onSignOut={handleSignOut}
         />
       </div>
@@ -188,6 +220,8 @@ export function MobileMenuButton() {
   const router = useRouter()
   const supabase = createClient()
   const [userPlan, setUserPlan] = useState<string>('free')
+  const [daysLeft, setDaysLeft] = useState<number | null>(null)
+  const [isTrialing, setIsTrialing] = useState(false)
 
   useEffect(() => {
     const fetchUserPlan = async () => {
@@ -195,11 +229,14 @@ export function MobileMenuButton() {
       if (user) {
         const { data } = await supabase
           .from('users')
-          .select('plan')
+          .select('plan, trial_ends_at, subscription_status')
           .eq('id', user.id)
           .single()
-        if (data?.plan) {
-          setUserPlan(data.plan)
+        if (data) {
+          const effective = getEffectivePlan(data)
+          setUserPlan(effective.plan)
+          setDaysLeft(effective.daysLeft)
+          setIsTrialing(effective.isTrialing)
         }
       }
     }
@@ -223,7 +260,9 @@ export function MobileMenuButton() {
         <div className="flex h-full flex-col">
           <SidebarContent 
             pathname={pathname} 
-            userPlan={userPlan} 
+            userPlan={userPlan}
+            daysLeft={daysLeft}
+            isTrialing={isTrialing}
             onSignOut={handleSignOut}
             onNavigate={() => setOpen(false)}
           />
