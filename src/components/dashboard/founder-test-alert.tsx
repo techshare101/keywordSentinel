@@ -10,7 +10,7 @@ import { Loader2, Mail, Shield, Zap } from 'lucide-react'
 // Founder emails that can see this component
 const FOUNDER_EMAILS = [
   'support@metalmindtech.com',
-  // Add other founder emails here
+  'valentinv2000@gmail.com',
 ]
 
 interface FounderTestAlertProps {

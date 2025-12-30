@@ -5,7 +5,7 @@ import { sendEmailAlert } from '@/lib/services/alerts'
 // Founder emails that can use the test alert feature
 const FOUNDER_EMAILS = [
   'support@metalmindtech.com',
-  // Add other founder emails here
+  'valentinv2000@gmail.com',
 ]
 
 // Create admin client for server-side operations
