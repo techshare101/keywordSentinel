@@ -90,7 +90,7 @@ export function TeamSettings() {
     }
 
     // Get team members with user info
-    const { data: membersData } = await supabase
+    const { data: membersData, error: membersError } = await supabase
       .from('team_members')
       .select(`
         *,
@@ -101,6 +101,10 @@ export function TeamSettings() {
       `)
       .eq('team_id', userData.team_id)
       .order('created_at', { ascending: true })
+
+    if (membersError) {
+      console.error('Error fetching team members:', membersError)
+    }
 
     if (membersData) {
       setMembers(membersData as TeamMemberWithUser[])

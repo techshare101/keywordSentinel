@@ -33,11 +33,17 @@ export function TrialCountdownBanner() {
         return
       }
 
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('users')
         .select('plan, trial_ends_at, subscription_status')
         .eq('id', user.id)
         .single()
+
+      if (profileError) {
+        console.error('Error fetching trial info:', profileError)
+        setLoading(false)
+        return
+      }
 
       if (!profile) {
         setLoading(false)
