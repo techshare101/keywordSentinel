@@ -29,7 +29,10 @@ interface AlertWithMatch extends Alert {
     title: string
     source: string
     keywords: { keyword: string }
-  }
+  } | null
+  is_test?: boolean
+  alert_type?: string
+  message?: string
 }
 
 const channelIcons: Record<string, React.ReactNode> = {
@@ -82,9 +85,11 @@ export default function AlertsPage() {
     setLoading(false)
   }
 
-  const sentCount = alerts.filter(a => a.status === 'sent').length
-  const pendingCount = alerts.filter(a => a.status === 'pending').length
-  const failedCount = alerts.filter(a => a.status === 'failed').length
+  // Exclude test alerts from totals
+  const realAlerts = alerts.filter(a => !a.is_test)
+  const sentCount = realAlerts.filter(a => a.status === 'sent').length
+  const pendingCount = realAlerts.filter(a => a.status === 'pending').length
+  const failedCount = realAlerts.filter(a => a.status === 'failed').length
 
   if (loading) {
     return (
@@ -157,16 +162,31 @@ export default function AlertsPage() {
                     <TableRow key={alert.id} className="border-slate-800 hover:bg-slate-800/50">
                       <TableCell>
                         <div>
-                          <p className="font-medium text-white truncate max-w-xs">
-                            {alert.matches?.title || 'Unknown match'}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-white truncate max-w-xs">
+                              {alert.is_test ? 'Test Alert' : (alert.matches?.title || 'Unknown match')}
+                            </p>
+                            {alert.is_test && (
+                              <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30 text-xs">
+                                Test
+                              </Badge>
+                            )}
+                          </div>
                           <div className="flex items-center gap-2 mt-1">
-                            <Badge variant="outline" className="text-xs border-slate-700 text-slate-400">
-                              {alert.matches?.keywords?.keyword}
-                            </Badge>
-                            <span className="text-xs text-slate-500">
-                              {alert.matches?.source}
-                            </span>
+                            {alert.is_test ? (
+                              <span className="text-xs text-slate-500">
+                                {alert.message || 'Verify email delivery'}
+                              </span>
+                            ) : (
+                              <>
+                                <Badge variant="outline" className="text-xs border-slate-700 text-slate-400">
+                                  {alert.matches?.keywords?.keyword}
+                                </Badge>
+                                <span className="text-xs text-slate-500">
+                                  {alert.matches?.source}
+                                </span>
+                              </>
+                            )}
                           </div>
                         </div>
                       </TableCell>

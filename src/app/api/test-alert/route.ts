@@ -106,6 +106,19 @@ export async function POST(request: Request) {
     console.log(`[Test Alert] Sending test alert to founder: ${profile.email}`)
     const sent = await sendEmailAlert(profile.email, [testMatch as any])
 
+    // Log the test alert to the alerts table
+    const alertStatus = sent ? 'sent' : 'failed'
+    await supabaseAdmin.from('alerts').insert({
+      user_id: user.id,
+      match_id: null, // Test alerts don't have a real match
+      channel: 'email',
+      status: alertStatus,
+      is_test: true,
+      alert_type: 'test',
+      message: 'Test alert to verify email delivery',
+      sent_at: new Date().toISOString(),
+    })
+
     if (sent) {
       console.log(`[Test Alert] ✅ Test alert sent successfully to ${profile.email}`)
       return NextResponse.json({ 
