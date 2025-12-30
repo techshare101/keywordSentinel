@@ -3,11 +3,11 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { Loader2, Mail, Shield, Zap } from 'lucide-react'
 
-// Founder emails that can see this component
+// Founder emails that can see this component (checked client-side for UI only)
+// Actual authorization happens server-side in the API route
 const FOUNDER_EMAILS = [
   'support@metalmindtech.com',
   'valentinv2000@gmail.com',
@@ -20,9 +20,8 @@ interface FounderTestAlertProps {
 
 export function FounderTestAlert({ userEmail }: FounderTestAlertProps) {
   const [sending, setSending] = useState(false)
-  const supabase = createClient()
 
-  // Only show for founders
+  // Only show for founders (UI-level check, server validates too)
   const isFounder = userEmail && FOUNDER_EMAILS.some(e => e.toLowerCase() === userEmail.toLowerCase())
   
   if (!isFounder) {
@@ -33,16 +32,11 @@ export function FounderTestAlert({ userEmail }: FounderTestAlertProps) {
     setSending(true)
     
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session?.access_token) {
-        toast.error('Not authenticated')
-        return
-      }
-
+      // Call the server API route - it handles auth via cookies
       const response = await fetch('/api/test-alert', {
         method: 'POST',
+        credentials: 'include', // Include cookies for auth
         headers: {
-          'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json'
         }
       })

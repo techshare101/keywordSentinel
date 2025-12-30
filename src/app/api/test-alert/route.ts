@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 import { sendEmailAlert } from '@/lib/services/alerts'
 
 // Founder emails that can use the test alert feature
@@ -9,7 +11,7 @@ const FOUNDER_EMAILS = [
   'valentin2v2000@gmail.com',
 ]
 
-// Create admin client for server-side operations
+// Create admin client for server-side operations (bypasses RLS)
 function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -21,6 +23,23 @@ function getSupabaseAdmin() {
   return createClient(url, key)
 }
 
+// Create server client for auth (reads cookies)
+async function getSupabaseServer() {
+  const cookieStore = await cookies()
+  
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+      },
+    }
+  )
+}
+
 /**
  * POST /api/test-alert
  * Founder-only endpoint to send a test HOT lead email alert
@@ -28,24 +47,19 @@ function getSupabaseAdmin() {
  */
 export async function POST(request: Request) {
   try {
-    const supabase = getSupabaseAdmin()
+    // Get user from cookies
+    const supabaseAuth = await getSupabaseServer()
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser()
     
-    // Get the authorization header
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized - please log in' }, { status: 401 })
     }
 
-    const token = authHeader.split(' ')[1]
-    
-    // Verify the user
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    // Use admin client to query user profile (bypasses RLS)
+    const supabaseAdmin = getSupabaseAdmin()
 
     // Get user profile
-    const { data: profile } = await supabase
+    const { data: profile } = await supabaseAdmin
       .from('users')
       .select('email, plan')
       .eq('id', user.id)
