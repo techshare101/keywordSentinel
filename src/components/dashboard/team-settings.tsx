@@ -89,16 +89,10 @@ export function TeamSettings() {
       setIsOwner(teamData.owner_id === user.id)
     }
 
-    // Get team members with user info
+    // Get team members (without join - FK relationship may not be cached)
     const { data: membersData, error: membersError } = await supabase
       .from('team_members')
-      .select(`
-        *,
-        users:user_id (
-          email,
-          full_name
-        )
-      `)
+      .select('*')
       .eq('team_id', userData.team_id)
       .order('created_at', { ascending: true })
 
@@ -106,8 +100,21 @@ export function TeamSettings() {
       console.error('Error fetching team members:', membersError)
     }
 
-    if (membersData) {
-      setMembers(membersData as TeamMemberWithUser[])
+    if (membersData && membersData.length > 0) {
+      // Fetch user info separately to avoid FK join issues
+      const userIds = membersData.map(m => m.user_id)
+      const { data: usersData } = await supabase
+        .from('users')
+        .select('id, email, full_name')
+        .in('id', userIds)
+
+      // Merge user data into members
+      const membersWithUsers = membersData.map(member => ({
+        ...member,
+        users: usersData?.find(u => u.id === member.user_id) || { email: '', full_name: null }
+      }))
+
+      setMembers(membersWithUsers as TeamMemberWithUser[])
       const currentMember = membersData.find(m => m.user_id === user.id)
       setIsAdmin(currentMember?.role === 'admin' || currentMember?.role === 'owner')
     }

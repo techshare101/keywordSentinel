@@ -35,12 +35,12 @@ export function TrialCountdownBanner() {
 
       const { data: profile, error: profileError } = await supabase
         .from('users')
-        .select('plan, trial_ends_at, subscription_status')
+        .select('plan, subscription_status')
         .eq('id', user.id)
         .single()
 
       if (profileError) {
-        console.error('Error fetching trial info:', profileError)
+        // Silently fail - trial banner is not critical
         setLoading(false)
         return
       }
@@ -50,28 +50,15 @@ export function TrialCountdownBanner() {
         return
       }
 
-      // Calculate days remaining
-      let daysRemaining = 0
-      let isTrialing = false
-
-      if (profile.trial_ends_at) {
-        const endsAt = new Date(profile.trial_ends_at)
-        const now = new Date()
-        const diffMs = endsAt.getTime() - now.getTime()
-        daysRemaining = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)))
-        isTrialing = daysRemaining > 0 && profile.subscription_status !== 'active'
-      }
-
-      // If user is on a paid plan with active subscription, not trialing
-      if (['starter', 'pro', 'business', 'enterprise'].includes(profile.plan) && 
-          profile.subscription_status === 'active') {
-        isTrialing = false
-      }
+      // For now, disable trial banner until trial_ends_at column is added
+      // This is a pre-launch simplification
+      const isTrialing = false
+      const daysRemaining = 0
 
       setTrialInfo({
         isTrialing,
         daysRemaining,
-        trialEndsAt: profile.trial_ends_at,
+        trialEndsAt: null,
         plan: profile.plan || 'free',
         subscriptionStatus: profile.subscription_status || 'none'
       })
