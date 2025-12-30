@@ -11,7 +11,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { Progress } from '@/components/ui/progress'
-import { getPlanById, PLANS, type PlanId } from '@/lib/plans'
+import { getPlanById, PLANS, type PlanId, getEffectivePlan } from '@/lib/plans'
 import { Crown, Zap, Sparkles, ChevronRight } from 'lucide-react'
 
 export function PlanUsageBadge() {
@@ -33,14 +33,15 @@ export function PlanUsageBadge() {
     }
 
     const [profileRes, keywordsRes] = await Promise.all([
-      supabase.from('users').select('plan').eq('id', user.id).single(),
+      supabase.from('users').select('plan, trial_ends_at, subscription_status, role').eq('id', user.id).single(),
       supabase.from('keywords').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
     ])
 
-    if (profileRes.data?.plan && PLANS[profileRes.data.plan as PlanId]) {
-      setPlan(profileRes.data.plan as PlanId)
+    if (profileRes.data) {
+      // Use getEffectivePlan to handle admin/tester/trial logic
+      const { plan: effectivePlan } = getEffectivePlan(profileRes.data)
+      setPlan(effectivePlan)
     } else {
-      // Default to starter (no free tier)
       setPlan('starter')
     }
     if (keywordsRes.count !== null) {
@@ -64,6 +65,7 @@ export function PlanUsageBadge() {
       case 'business': return <Crown className="h-3 w-3" />
       case 'pro': return <Zap className="h-3 w-3" />
       case 'starter': return <Sparkles className="h-3 w-3" />
+      case 'trial': return <Sparkles className="h-3 w-3" />
       default: return null
     }
   }
@@ -73,6 +75,7 @@ export function PlanUsageBadge() {
       case 'business': return 'bg-purple-500/20 text-purple-400 border-purple-500/30'
       case 'pro': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
       case 'starter': return 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+      case 'trial': return 'bg-amber-500/20 text-amber-400 border-amber-500/30'
       default: return 'bg-slate-500/20 text-slate-400 border-slate-500/30'
     }
   }
