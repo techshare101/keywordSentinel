@@ -16,7 +16,9 @@ import {
   Zap,
   ThumbsUp,
   AlertTriangle,
+  Search,
 } from 'lucide-react'
+import { Input } from '@/components/ui/input'
 import { ReplyGenerator } from '@/components/dashboard/reply-generator'
 import { LeadReAnalyzer } from '@/components/dashboard/lead-re-analyzer'
 import { LeadStrategyModal } from '@/components/dashboard/lead-strategy-modal'
@@ -67,6 +69,7 @@ export default function LeadsPage() {
   const [leads, setLeads] = useState<LeadMatch[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'hot' | 'warm'>('all')
+  const [searchQuery, setSearchQuery] = useState('')
   const [userPlan, setUserPlan] = useState<string>('free')
   const supabase = createClient()
 
@@ -105,9 +108,22 @@ export default function LeadsPage() {
   }
 
   const filteredLeads = leads.filter(lead => {
-    if (filter === 'all') return true
-    const category = getScoreCategory(lead)
-    return category === filter
+    // Filter by category
+    if (filter !== 'all') {
+      const category = getScoreCategory(lead)
+      if (category !== filter) return false
+    }
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      return (
+        lead.title.toLowerCase().includes(query) ||
+        lead.content.toLowerCase().includes(query) ||
+        lead.keywords?.keyword?.toLowerCase().includes(query) ||
+        lead.source.toLowerCase().includes(query)
+      )
+    }
+    return true
   })
 
   const hotCount = leads.filter(l => getScoreCategory(l) === 'hot').length
@@ -133,6 +149,17 @@ export default function LeadsPage() {
             AI-identified high-value opportunities ranked by conversion potential.
           </p>
         </div>
+      </div>
+
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+        <Input
+          placeholder="Search leads by title, content, keyword, or source..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-10 bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
+        />
       </div>
 
       {/* Stats */}
