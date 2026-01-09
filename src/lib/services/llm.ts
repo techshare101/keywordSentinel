@@ -188,16 +188,17 @@ export async function generateReply(
     const model = getModelForTask('reply_generation')
     console.log(`[LLM] Reply generation model: ${model}`)
 
-    const response = await openrouter.chat.completions.create({
-        model,
-        messages: [
-            {
-                role: 'system',
-                content: 'You write concise, human-sounding sales replies. Never sound like marketing. Be helpful, specific, and direct.',
-            },
-            {
-                role: 'user',
-                content: `Write a ${tone} reply to this post. 
+    try {
+        const response = await openrouter.chat.completions.create({
+            model,
+            messages: [
+                {
+                    role: 'system',
+                    content: 'You write concise, human-sounding sales replies. Never sound like marketing. Be helpful, specific, and direct.',
+                },
+                {
+                    role: 'user',
+                    content: `Write a ${tone} reply to this post. 
         
 Lead Context:
 Title: ${lead.title}
@@ -207,10 +208,14 @@ Requirements:
 - Don't mention you are an AI.
 - Keep it under 2 paragraphs.
 - Focus on the problem mentioned.`,
-            },
-        ],
-        temperature: 0.5,
-    })
+                },
+            ],
+            temperature: 0.5,
+        })
 
-    return response.choices[0]?.message?.content || 'Failed to generate reply.'
+        return response.choices[0]?.message?.content || 'Failed to generate reply.'
+    } catch (error) {
+        console.error('[LLM] Reply generation error:', error)
+        throw new Error(`LLM API error: ${(error as Error).message}`)
+    }
 }
