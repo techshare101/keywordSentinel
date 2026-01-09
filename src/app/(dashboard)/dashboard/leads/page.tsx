@@ -23,6 +23,7 @@ import { LeadStrategyModal } from '@/components/dashboard/lead-strategy-modal'
 import { BookmarkButton } from '@/components/dashboard/bookmark-button'
 import { EnrichButton } from '@/components/dashboard/enrich-button'
 import type { Match } from '@/types/database'
+import { getEffectivePlan } from '@/lib/plans'
 
 interface LeadMatch extends Match {
   keywords: { keyword: string }
@@ -76,12 +77,13 @@ export default function LeadsPage() {
 
     const { data: userProfile } = await supabase
       .from('users')
-      .select('plan')
+      .select('plan, role, trial_ends_at, subscription_status')
       .eq('id', user.id)
       .single()
 
     if (userProfile) {
-      setUserPlan(userProfile.plan)
+      const effectivePlan = getEffectivePlan(userProfile)
+      setUserPlan(effectivePlan.plan)
     }
 
     const { data, error } = await supabase

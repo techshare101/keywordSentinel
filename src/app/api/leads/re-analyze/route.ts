@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { analyzeLeadPremium } from '@/lib/services/llm'
+import { getEffectivePlan } from '@/lib/plans'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,11 +17,12 @@ export async function POST(request: Request) {
         // Fetch user plan for gating
         const { data: profile } = await supabase
             .from('users')
-            .select('plan')
+            .select('plan, role, trial_ends_at, subscription_status')
             .eq('id', user.id)
             .single()
 
-        const userPlan = profile?.plan || 'free'
+        const effectivePlan = getEffectivePlan(profile || {})
+        const userPlan = effectivePlan.plan
 
         const body = await request.json()
         const { lead } = body

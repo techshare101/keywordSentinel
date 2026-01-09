@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { PLANS, getPlanById, type PlanId } from '@/lib/plans'
+import { PLANS, getPlanById, getEffectivePlan, type PlanId } from '@/lib/plans'
 
 interface PlanGateResult {
   userPlan: PlanId
@@ -57,12 +57,13 @@ export function usePlanGate(): PlanGateResult {
 
       const { data: profile } = await supabase
         .from('users')
-        .select('plan')
+        .select('plan, role, trial_ends_at, subscription_status')
         .eq('id', user.id)
         .single()
 
-      if (profile?.plan && PLANS[profile.plan as PlanId]) {
-        setUserPlan(profile.plan as PlanId)
+      if (profile) {
+        const effectivePlan = getEffectivePlan(profile)
+        setUserPlan(effectivePlan.plan)
       } else {
         // Default to starter if no plan set (no free tier)
         setUserPlan('starter')

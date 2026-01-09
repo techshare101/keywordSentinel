@@ -23,7 +23,7 @@ export function LeadReAnalyzer({ lead, userPlan }: LeadReAnalyzerProps) {
     const [analyzing, setAnalyzing] = useState(false)
     const [analysis, setAnalysis] = useState<string | null>(null)
 
-    const isPremium = userPlan === 'pro' || userPlan === 'team'
+    const isPremium = ['pro', 'business', 'enterprise', 'team'].includes(userPlan)
 
     const handleAnalyze = async () => {
         if (!isPremium) return
