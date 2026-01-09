@@ -262,11 +262,15 @@ export async function safeEnrichLead(
   }
 
   try {
-    const firecrawl = new Firecrawl({
-      apiKey: process.env.FIRECRAWL_API_KEY || '',
-    })
+    const apiKey = process.env.FIRECRAWL_API_KEY
+    if (!apiKey) {
+      console.error('[Firecrawl SAFE] API key not configured')
+      return { success: false, error: 'Firecrawl API key not configured' }
+    }
 
-    console.log(`[Firecrawl SAFE] Enriching lead ${matchId} for user ${userId}`)
+    const firecrawl = new Firecrawl({ apiKey })
+
+    console.log(`[Firecrawl SAFE] Enriching lead ${matchId} for user ${userId}, URL: ${url}`)
 
     const result = await firecrawl.scrape(url, { formats: ['markdown'] }) as any
 
@@ -274,7 +278,8 @@ export async function safeEnrichLead(
     await recordCall(userId, url, 'enrich')
 
     if (!result.success || !result.markdown) {
-      return { success: false, error: 'Failed to enrich lead' }
+      console.error('[Firecrawl SAFE] Scrape failed:', result)
+      return { success: false, error: result.error || 'Failed to enrich lead - no content returned' }
     }
 
     // Update the match with enriched content
