@@ -58,6 +58,9 @@ const sourceEmojis: Record<string, string> = {
   producthunt: '🟣',
   google_news: '📰',
   twitter: '🐦',
+  devto: '📝',
+  stackoverflow: '📚',
+  github: '🐙',
 }
 
 export default function LeadsPage() {

@@ -75,7 +75,7 @@ export type Database = {
           id: string
           keyword_id: string
           user_id: string
-          source: 'reddit' | 'hackernews' | 'producthunt' | 'google_news' | 'twitter'
+          source: 'reddit' | 'hackernews' | 'producthunt' | 'google_news' | 'twitter' | 'devto' | 'stackoverflow' | 'github'
           title: string
           content: string
           url: string
@@ -93,7 +93,7 @@ export type Database = {
           id?: string
           keyword_id: string
           user_id: string
-          source: 'reddit' | 'hackernews' | 'producthunt' | 'google_news' | 'twitter'
+          source: 'reddit' | 'hackernews' | 'producthunt' | 'google_news' | 'twitter' | 'devto' | 'stackoverflow' | 'github'
           title: string
           content: string
           url: string

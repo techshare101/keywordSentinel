@@ -2,6 +2,9 @@ import { searchReddit } from './reddit'
 import { searchHackerNews, searchHNComments } from './hackernews'
 import { searchProductHunt } from './producthunt'
 import { searchGoogleNews } from './googlenews'
+import { searchDevTo } from './devto'
+import { searchStackOverflow } from './stackoverflow'
+import { searchGitHub } from './github'
 import type { SourceType } from '@/types/database'
 
 export interface SearchResult {
@@ -34,6 +37,9 @@ export async function searchAllSources(keyword: string, plan: string = 'free'): 
     searchHNComments(keyword),
     searchGoogleNews(keyword),
     searchProductHunt(keyword),
+    searchDevTo(keyword),
+    searchStackOverflow(keyword),
+    searchGitHub(keyword),
   ])
 
   for (const result of results) {
@@ -69,6 +75,12 @@ export async function searchSource(
       return searchProductHunt(keyword)
     case 'google_news':
       return searchGoogleNews(keyword)
+    case 'devto':
+      return searchDevTo(keyword)
+    case 'stackoverflow':
+      return searchStackOverflow(keyword)
+    case 'github':
+      return searchGitHub(keyword)
     default:
       return []
   }
@@ -78,3 +90,6 @@ export { searchReddit } from './reddit'
 export { searchHackerNews, searchHNComments } from './hackernews'
 export { searchProductHunt } from './producthunt'
 export { searchGoogleNews } from './googlenews'
+export { searchDevTo } from './devto'
+export { searchStackOverflow } from './stackoverflow'
+export { searchGitHub } from './github'

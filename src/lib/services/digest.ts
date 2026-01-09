@@ -151,6 +151,9 @@ export async function sendWeeklyDigest(
     producthunt: '🟣',
     google_news: '📰',
     twitter: '🐦',
+    devto: '📝',
+    stackoverflow: '📚',
+    github: '🐙',
   }
 
   const opportunitiesHtml = digest.topOpportunities.length > 0

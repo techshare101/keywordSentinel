@@ -28,7 +28,7 @@ export async function searchReddit(keyword: string, limit: number = 25): Promise
   try {
     const encodedKeyword = encodeURIComponent(keyword)
     const response = await fetch(
-      `https://www.reddit.com/search.json?q=${encodedKeyword}&sort=new&limit=${limit}&t=day`,
+      `https://www.reddit.com/search.json?q=${encodedKeyword}&sort=new&limit=${limit}&t=week`,
       {
         headers: {
           'User-Agent': 'KeywordSentinel/1.0',

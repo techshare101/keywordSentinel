@@ -49,6 +49,9 @@ const sourceLabels: Record<SourceType, { label: string; emoji: string }> = {
   producthunt: { label: 'Product Hunt', emoji: '🟣' },
   google_news: { label: 'Google News', emoji: '📰' },
   twitter: { label: 'Twitter/X', emoji: '🐦' },
+  devto: { label: 'Dev.to', emoji: '📝' },
+  stackoverflow: { label: 'Stack Overflow', emoji: '📚' },
+  github: { label: 'GitHub', emoji: '🐙' },
 }
 
 const sentimentColors: Record<string, string> = {
