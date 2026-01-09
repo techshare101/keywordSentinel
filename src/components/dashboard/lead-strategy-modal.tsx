@@ -24,7 +24,7 @@ export function LeadStrategyModal({ lead, userPlan }: LeadStrategyModalProps) {
     const [loading, setLoading] = useState(false)
     const [strategy, setStrategy] = useState<StrategicAdvice | null>(null)
 
-    const isPremium = userPlan === 'pro' || userPlan === 'team'
+    const isPremium = ['pro', 'business', 'enterprise', 'team'].includes(userPlan)
 
     const fetchStrategy = async () => {
         if (!isPremium) return
