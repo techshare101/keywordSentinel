@@ -16,24 +16,25 @@ export async function getLeadStrategy(
     lead: any,
     userPlan: string
 ): Promise<StrategicAdvice> {
-    if (userPlan !== 'pro' && userPlan !== 'team') {
-        throw new Error('Agent services require a Pro or Team plan')
+    if (!['pro', 'business', 'enterprise', 'team'].includes(userPlan)) {
+        throw new Error('Agent services require a Pro plan or higher')
     }
 
     console.log('[Agent] Requesting strategy from OpenAI Lead Strategist...')
 
-    const response = await openai.chat.completions.create({
-        model: 'gpt-4o', // Use strong reasoning model for agents
-        messages: [
-            {
-                role: 'system',
-                content: `You are the Lead Strategist for KeywordSentinel. Your job is to help the user convert a specific lead.
+    try {
+        const response = await openai.chat.completions.create({
+            model: 'gpt-4o', // Use strong reasoning model for agents
+            messages: [
+                {
+                    role: 'system',
+                    content: `You are the Lead Strategist for KeywordSentinel. Your job is to help the user convert a specific lead.
 You analyze the post context and provide a clear, tactical strategy.
 Be concise, professional, and insight-driven.`,
-            },
-            {
-                role: 'user',
-                content: `Lead Data:
+                },
+                {
+                    role: 'user',
+                    content: `Lead Data:
 Title: ${lead.title}
 Content: ${lead.content}
 Source: ${lead.source}
@@ -45,12 +46,16 @@ Provide a tactical strategy in JSON format:
   "entry_point": "The exact first sentence or question to ask",
   "danger_zones": ["List of things to avoid saying or doing"]
 }`,
-            },
-        ],
-        temperature: 0.4,
-        response_format: { type: 'json_object' },
-    })
+                },
+            ],
+            temperature: 0.4,
+            response_format: { type: 'json_object' },
+        })
 
-    const text = response.choices[0]?.message?.content || '{}'
-    return JSON.parse(text) as StrategicAdvice
+        const text = response.choices[0]?.message?.content || '{}'
+        return JSON.parse(text) as StrategicAdvice
+    } catch (error) {
+        console.error('[Agent] Strategist error:', error)
+        throw new Error(`OpenAI API error: ${(error as Error).message}`)
+    }
 }
