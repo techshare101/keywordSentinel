@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getEffectivePlan, getPlanById } from '@/lib/plans'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -38,9 +39,12 @@ export default async function DashboardPage() {
 
   const { data: profile } = await supabase
     .from('users')
-    .select('*')
+    .select('*, role, trial_ends_at, subscription_status')
     .eq('id', user!.id)
     .single()
+
+  const effectivePlan = getEffectivePlan(profile || {})
+  const planData = getPlanById(effectivePlan.plan)
 
   const { count: keywordCount } = await supabase
     .from('keywords')
@@ -69,7 +73,7 @@ export default async function DashboardPage() {
     {
       name: 'Active Keywords',
       value: keywordCount || 0,
-      limit: profile?.keywords_limit || 3,
+      limit: planData?.keywords || 3,
       icon: Search,
       color: 'text-blue-400',
       bgColor: 'bg-blue-500/10',
@@ -90,7 +94,7 @@ export default async function DashboardPage() {
     },
     {
       name: 'Scan Interval',
-      value: `${profile?.scan_interval_minutes || 60}m`,
+      value: `${planData?.scanInterval || 60}m`,
       icon: Zap,
       color: 'text-purple-400',
       bgColor: 'bg-purple-500/10',
