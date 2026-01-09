@@ -23,6 +23,9 @@ export async function POST(request: Request) {
 
     const effectivePlan = getEffectivePlan(profile || {})
     const userPlan = effectivePlan.plan
+    
+    console.log('[Reply Generate] Profile:', JSON.stringify(profile))
+    console.log('[Reply Generate] Effective plan:', userPlan, 'Source:', effectivePlan.source)
 
     const body = await request.json()
     const { lead, tone } = body
