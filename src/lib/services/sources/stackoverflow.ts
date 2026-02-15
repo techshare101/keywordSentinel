@@ -40,11 +40,13 @@ export async function searchStackOverflow(keyword: string, limit: number = 25): 
     const oneWeekAgo = Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000)
     
     // Stack Exchange API - search questions from last 7 days
+    // Note: Do NOT set Accept-Encoding: gzip — Node fetch doesn't auto-decompress
     const response = await fetch(
       `https://api.stackexchange.com/2.3/search/advanced?order=desc&sort=creation&q=${encodedKeyword}&fromdate=${oneWeekAgo}&site=stackoverflow&pagesize=${limit}&filter=withbody`,
       {
         headers: {
-          'Accept-Encoding': 'gzip',
+          'Accept': 'application/json',
+          'User-Agent': 'KeywordSentinel/1.0',
         },
       }
     )
@@ -97,7 +99,8 @@ export async function searchStackOverflowByTag(tag: string, limit: number = 25):
       `https://api.stackexchange.com/2.3/questions?order=desc&sort=creation&tagged=${encodedTag}&fromdate=${oneWeekAgo}&site=stackoverflow&pagesize=${limit}`,
       {
         headers: {
-          'Accept-Encoding': 'gzip',
+          'Accept': 'application/json',
+          'User-Agent': 'KeywordSentinel/1.0',
         },
       }
     )

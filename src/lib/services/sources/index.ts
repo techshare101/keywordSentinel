@@ -5,6 +5,7 @@ import { searchGoogleNews } from './googlenews'
 import { searchDevTo } from './devto'
 import { searchStackOverflow } from './stackoverflow'
 import { searchGitHub } from './github'
+import { searchTwitter } from './twitter'
 import type { SourceType } from '@/types/database'
 
 export interface SearchResult {
@@ -31,6 +32,11 @@ export async function searchAllSources(keyword: string, plan: string = 'free'): 
   // Run FREE APIs only - no Firecrawl in automated scans
   console.log(`[Search] Scanning free sources for: "${keyword}" (Plan: ${plan})`)
   
+  const sourceNames = [
+    'Reddit', 'HackerNews', 'HN Comments', 'Google News',
+    'Product Hunt', 'Dev.to', 'StackOverflow', 'GitHub', 'Twitter/X',
+  ]
+
   const results = await Promise.allSettled([
     searchReddit(keyword),
     searchHackerNews(keyword),
@@ -40,15 +46,20 @@ export async function searchAllSources(keyword: string, plan: string = 'free'): 
     searchDevTo(keyword),
     searchStackOverflow(keyword),
     searchGitHub(keyword),
+    searchTwitter(keyword),
   ])
 
-  for (const result of results) {
+  for (let i = 0; i < results.length; i++) {
+    const result = results[i]
     if (result.status === 'fulfilled') {
+      console.log(`[Search] ${sourceNames[i]}: ${result.value.length} results`)
       result.value.forEach(r => {
         if (!allResultsMap.has(r.url)) {
           allResultsMap.set(r.url, r)
         }
       })
+    } else {
+      console.error(`[Search] ${sourceNames[i]} FAILED:`, result.reason?.message || result.reason)
     }
   }
 
@@ -81,6 +92,8 @@ export async function searchSource(
       return searchStackOverflow(keyword)
     case 'github':
       return searchGitHub(keyword)
+    case 'twitter':
+      return searchTwitter(keyword)
     default:
       return []
   }
@@ -93,3 +106,4 @@ export { searchGoogleNews } from './googlenews'
 export { searchDevTo } from './devto'
 export { searchStackOverflow } from './stackoverflow'
 export { searchGitHub } from './github'
+export { searchTwitter, enrichTweetWithFxTwitter } from './twitter'

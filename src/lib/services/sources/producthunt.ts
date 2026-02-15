@@ -12,36 +12,105 @@ interface PHSearchResult {
 }
 
 export async function searchProductHunt(keyword: string): Promise<PHSearchResult[]> {
-  // Product Hunt requires OAuth for their API
-  // For MVP, we'll use a simple RSS/web scraping approach
-  // In production, you'd want to use their GraphQL API with proper auth
-  
   try {
-    // Using a public endpoint that doesn't require auth
-    // This is a simplified version - in production use their official API
+    // Use Product Hunt's RSS feed — no API key required
+    const encodedKeyword = encodeURIComponent(keyword)
     const response = await fetch(
-      `https://www.producthunt.com/search?q=${encodeURIComponent(keyword)}`,
+      `https://www.producthunt.com/feed?category=${encodedKeyword}`,
       {
         headers: {
-          'User-Agent': 'KeywordSentinel/1.0',
-          'Accept': 'text/html',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': 'application/rss+xml, application/xml, text/xml, text/html',
         },
       }
     )
 
     if (!response.ok) {
-      console.error('Product Hunt error:', response.status)
+      // Fallback: try the main feed and filter by keyword
+      console.log('[ProductHunt] Category feed failed, trying main feed filter')
+      return await searchProductHuntMainFeed(keyword)
+    }
+
+    const xml = await response.text()
+    return parsePHRss(xml, keyword)
+  } catch (error) {
+    console.error('[ProductHunt] Error searching:', error)
+    // Fallback to main feed
+    return await searchProductHuntMainFeed(keyword)
+  }
+}
+
+async function searchProductHuntMainFeed(keyword: string): Promise<PHSearchResult[]> {
+  try {
+    const response = await fetch('https://www.producthunt.com/feed', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/rss+xml, application/xml, text/xml, text/html',
+      },
+    })
+
+    if (!response.ok) {
+      console.error('[ProductHunt] Main feed error:', response.status)
       return []
     }
 
-    // For MVP, return empty - implement proper API integration later
-    // Product Hunt's API requires OAuth setup
-    console.log('Product Hunt search requires API key setup')
-    return []
+    const xml = await response.text()
+    return parsePHRss(xml, keyword)
   } catch (error) {
-    console.error('Error searching Product Hunt:', error)
+    console.error('[ProductHunt] Main feed error:', error)
     return []
   }
+}
+
+function parsePHRss(xml: string, keyword: string): PHSearchResult[] {
+  const results: PHSearchResult[] = []
+  const itemRegex = /<item>([\s\S]*?)<\/item>/g
+  const keywordLower = keyword.toLowerCase()
+  let match
+
+  while ((match = itemRegex.exec(xml)) !== null) {
+    const item = match[1]
+    const title = extractPHTag(item, 'title') || ''
+    const link = extractPHTag(item, 'link') || ''
+    const description = extractPHTag(item, 'description') || ''
+    const pubDate = extractPHTag(item, 'pubDate') || new Date().toISOString()
+
+    // Filter by keyword match in title or description
+    const matchesKeyword =
+      title.toLowerCase().includes(keywordLower) ||
+      description.toLowerCase().includes(keywordLower)
+
+    if (link && matchesKeyword) {
+      results.push({
+        title: decodePHEntities(title),
+        content: decodePHEntities(description).replace(/<[^>]+>/g, '').slice(0, 2000),
+        url: link,
+        author: 'Product Hunt',
+        source: 'producthunt' as const,
+        createdAt: new Date(pubDate),
+        metadata: {
+          tagline: decodePHEntities(description).replace(/<[^>]+>/g, '').slice(0, 200),
+          votesCount: 0,
+        },
+      })
+    }
+  }
+
+  console.log(`[ProductHunt] Found ${results.length} matching items for "${keyword}"`)
+  return results.slice(0, 25)
+}
+
+function extractPHTag(xml: string, tag: string): string {
+  const regex = new RegExp(`<${tag}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${tag}>|<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`)
+  const m = regex.exec(xml)
+  return m ? (m[1] || m[2] || '').trim() : ''
+}
+
+function decodePHEntities(text: string): string {
+  const entities: Record<string, string> = {
+    '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'", '&apos;': "'",
+  }
+  return text.replace(/&[^;]+;/g, (e) => entities[e] || e)
 }
 
 // Placeholder for when PH API is configured

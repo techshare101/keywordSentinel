@@ -35,9 +35,10 @@ export async function searchDevTo(keyword: string, limit: number = 25): Promise<
   try {
     const encodedKeyword = encodeURIComponent(keyword)
     
-    // Dev.to API - search articles from last 7 days
-    const response = await fetch(
-      `https://dev.to/api/articles?per_page=${limit}&tag=${encodedKeyword}`,
+    // Dev.to API - full-text search (not just tags)
+    // Try search endpoint first, then fall back to tag-based
+    const searchResponse = await fetch(
+      `https://dev.to/api/articles?per_page=${limit}&search=${encodedKeyword}`,
       {
         headers: {
           'User-Agent': 'KeywordSentinel/1.0',
@@ -46,12 +47,27 @@ export async function searchDevTo(keyword: string, limit: number = 25): Promise<
       }
     )
 
-    if (!response.ok) {
-      console.error('[DevTo] API error:', response.status)
-      return []
-    }
+    let articles: DevToArticle[] = []
 
-    const articles: DevToArticle[] = await response.json()
+    if (searchResponse.ok) {
+      articles = await searchResponse.json()
+    } else {
+      // Fallback: tag-based search
+      const tagResponse = await fetch(
+        `https://dev.to/api/articles?per_page=${limit}&tag=${encodedKeyword}`,
+        {
+          headers: {
+            'User-Agent': 'KeywordSentinel/1.0',
+            'Accept': 'application/json',
+          },
+        }
+      )
+      if (!tagResponse.ok) {
+        console.error('[DevTo] API error:', tagResponse.status)
+        return []
+      }
+      articles = await tagResponse.json()
+    }
 
     // Filter to last 7 days
     const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
