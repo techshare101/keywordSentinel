@@ -6,6 +6,7 @@ import { searchDevTo } from './devto'
 import { searchStackOverflow } from './stackoverflow'
 import { searchGitHub } from './github'
 import { searchTwitter } from './twitter'
+import { isCrawlerAvailable, crawlerSearch } from './crawler-client'
 import type { SourceType } from '@/types/database'
 
 export interface SearchResult {
@@ -63,12 +64,59 @@ export async function searchAllSources(keyword: string, plan: string = 'free'): 
     }
   }
 
+  // Crawler fallback: retry failed/empty sources via Crawl4AI service
+  if (isCrawlerAvailable()) {
+    const sourceMap: [string, SourceType][] = [
+      ['Reddit', 'reddit'],
+      ['HackerNews', 'hackernews'],
+      ['HN Comments', 'hackernews'],
+      ['Google News', 'google_news'],
+      ['Product Hunt', 'producthunt'],
+      ['Dev.to', 'devto'],
+      ['StackOverflow', 'stackoverflow'],
+      ['GitHub', 'github'],
+      ['Twitter/X', 'twitter'],
+    ]
+
+    const failedSources = new Set<SourceType>()
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i]
+      const [, sourceType] = sourceMap[i]
+      if (
+        (result.status === 'rejected') ||
+        (result.status === 'fulfilled' && result.value.length === 0)
+      ) {
+        failedSources.add(sourceType)
+      }
+    }
+
+    if (failedSources.size > 0) {
+      console.log(`[Search] Crawler fallback for: ${[...failedSources].join(', ')}`)
+      const crawlerResults = await Promise.allSettled(
+        [...failedSources].map(source => crawlerSearch(source, keyword))
+      )
+
+      const sourceArr = [...failedSources]
+      for (let i = 0; i < crawlerResults.length; i++) {
+        const cr = crawlerResults[i]
+        if (cr.status === 'fulfilled' && cr.value.length > 0) {
+          console.log(`[Search] Crawler ${sourceArr[i]}: ${cr.value.length} results`)
+          cr.value.forEach(r => {
+            if (!allResultsMap.has(r.url)) {
+              allResultsMap.set(r.url, r)
+            }
+          })
+        }
+      }
+    }
+  }
+
   const finalResults = Array.from(allResultsMap.values())
 
   // Sort by date, newest first
   finalResults.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
 
-  console.log(`[Search] Found ${finalResults.length} results for "${keyword}"`)
+  console.log(`[Search] Found ${finalResults.length} total results for "${keyword}"`)
 
   return finalResults
 }
@@ -107,3 +155,4 @@ export { searchDevTo } from './devto'
 export { searchStackOverflow } from './stackoverflow'
 export { searchGitHub } from './github'
 export { searchTwitter, enrichTweetWithFxTwitter } from './twitter'
+export { isCrawlerAvailable, crawlerSearch, crawlerCrawl, crawlerHealthCheck } from './crawler-client'
