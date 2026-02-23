@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { scanKeywordsForUser } from '@/lib/services/scanner'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 300 // 5 minutes max for scans with crawler fallback
 
 export async function POST() {
   try {
