@@ -24,9 +24,11 @@ from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
 
 
 # ---------------------------------------------------------------------------
-# Global crawler instance (reused across requests)
+# Global crawler instance (lazy-initialized on first request)
 # ---------------------------------------------------------------------------
 crawler: Optional[AsyncWebCrawler] = None
+crawler_ready = False
+crawler_lock = asyncio.Lock()
 
 browser_config = BrowserConfig(
     browser_type="chromium",
@@ -35,23 +37,32 @@ browser_config = BrowserConfig(
     extra_args=["--disable-gpu", "--no-sandbox", "--disable-dev-shm-usage"],
 )
 
-run_config = CrawlerRunConfig(
-    cache_mode=CacheMode.BYPASS,
-    word_count_threshold=5,
-    remove_overlay_elements=True,
-    process_iframes=False,
-)
+
+async def get_crawler() -> AsyncWebCrawler:
+    """Lazy-init the crawler on first use so the server starts fast."""
+    global crawler, crawler_ready
+    if crawler_ready and crawler:
+        return crawler
+    async with crawler_lock:
+        if crawler_ready and crawler:
+            return crawler
+        print("[Crawler] Initializing browser (first request)...")
+        crawler = AsyncWebCrawler(config=browser_config)
+        await crawler.start()
+        crawler_ready = True
+        print("[Crawler] Browser ready")
+        return crawler
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Start crawler on startup, close on shutdown."""
-    global crawler
-    crawler = AsyncWebCrawler(config=browser_config)
-    await crawler.start()
-    print("[Crawler] Started and ready")
+    """Server lifecycle — crawler is lazy-initialized, cleaned up on shutdown."""
+    print("[Crawler] Server starting (browser will init on first request)")
     yield
-    await crawler.close()
+    global crawler, crawler_ready
+    if crawler:
+        await crawler.close()
+        crawler_ready = False
     print("[Crawler] Shut down")
 
 
@@ -117,16 +128,15 @@ class SearchResponse(BaseModel):
 # ---------------------------------------------------------------------------
 @app.get("/health")
 async def health():
-    return {"status": "ok", "crawler_ready": crawler is not None}
+    return {"status": "ok", "crawler_ready": crawler_ready}
 
 
 @app.post("/crawl", response_model=CrawlResponse)
 async def crawl_url(req: CrawlRequest):
     """Crawl a single URL and return markdown content."""
-    if not crawler:
-        raise HTTPException(status_code=503, detail="Crawler not ready")
-
     try:
+        c = await get_crawler()
+
         cfg = CrawlerRunConfig(
             cache_mode=CacheMode.BYPASS,
             word_count_threshold=5,
@@ -135,7 +145,7 @@ async def crawl_url(req: CrawlRequest):
         )
 
         result = await asyncio.wait_for(
-            crawler.arun(url=req.url, config=cfg),
+            c.arun(url=req.url, config=cfg),
             timeout=req.timeout,
         )
 
@@ -178,9 +188,6 @@ async def crawl_url(req: CrawlRequest):
 @app.post("/search", response_model=SearchResponse)
 async def search_source(req: SearchRequest):
     """Search a specific source for a keyword by crawling it."""
-    if not crawler:
-        raise HTTPException(status_code=503, detail="Crawler not ready")
-
     source = req.source.lower()
     try:
         if source == "reddit":
@@ -234,8 +241,9 @@ async def search_reddit(keyword: str, limit: int) -> list[SearchResult]:
         css_selector="div.search-result",
     )
 
+    c = await get_crawler()
     result = await asyncio.wait_for(
-        crawler.arun(url=url, config=cfg), timeout=30
+        c.arun(url=url, config=cfg), timeout=30
     )
 
     if not result.success or not result.html:
@@ -295,8 +303,9 @@ async def search_twitter(keyword: str, limit: int) -> list[SearchResult]:
                 css_selector=".timeline-item",
             )
 
+            c = await get_crawler()
             result = await asyncio.wait_for(
-                crawler.arun(url=url, config=cfg), timeout=20
+                c.arun(url=url, config=cfg), timeout=20
             )
 
             if not result.success or not result.markdown:
@@ -324,8 +333,9 @@ async def search_producthunt(keyword: str, limit: int) -> list[SearchResult]:
     )
 
     try:
+        c = await get_crawler()
         result = await asyncio.wait_for(
-            crawler.arun(url=url, config=cfg), timeout=30
+            c.arun(url=url, config=cfg), timeout=30
         )
     except asyncio.TimeoutError:
         return []
@@ -346,8 +356,9 @@ async def search_devto(keyword: str, limit: int) -> list[SearchResult]:
         css_selector=".crayons-story",
     )
 
+    c = await get_crawler()
     result = await asyncio.wait_for(
-        crawler.arun(url=url, config=cfg), timeout=25
+        c.arun(url=url, config=cfg), timeout=25
     )
 
     if not result.success or not result.markdown:
@@ -365,8 +376,9 @@ async def search_hackernews(keyword: str, limit: int) -> list[SearchResult]:
         word_count_threshold=3,
     )
 
+    c = await get_crawler()
     result = await asyncio.wait_for(
-        crawler.arun(url=url, config=cfg), timeout=25
+        c.arun(url=url, config=cfg), timeout=25
     )
 
     if not result.success or not result.markdown:
@@ -385,8 +397,9 @@ async def search_stackoverflow(keyword: str, limit: int) -> list[SearchResult]:
         css_selector=".question-summary",
     )
 
+    c = await get_crawler()
     result = await asyncio.wait_for(
-        crawler.arun(url=url, config=cfg), timeout=25
+        c.arun(url=url, config=cfg), timeout=25
     )
 
     if not result.success or not result.markdown:
@@ -404,8 +417,9 @@ async def search_github(keyword: str, limit: int) -> list[SearchResult]:
         word_count_threshold=3,
     )
 
+    c = await get_crawler()
     result = await asyncio.wait_for(
-        crawler.arun(url=url, config=cfg), timeout=25
+        c.arun(url=url, config=cfg), timeout=25
     )
 
     if not result.success or not result.markdown:
