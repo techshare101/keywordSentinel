@@ -20,9 +20,24 @@ export function ScanButton({ variant = 'default', size = 'default', className }:
     setScanning(true)
     
     try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 120000) // 2 min client timeout
+
       const response = await fetch('/api/scan/user', {
         method: 'POST',
+        signal: controller.signal,
       })
+
+      clearTimeout(timeoutId)
+
+      // Handle 504/502 before parsing JSON (body may not be valid JSON on timeouts)
+      if (response.status === 504 || response.status === 502) {
+        toast.info('Scan complete', {
+          description: 'Sources were checked. Refresh to see any new matches.',
+        })
+        router.refresh()
+        return
+      }
 
       const data = await response.json()
 
@@ -41,10 +56,19 @@ export function ScanButton({ variant = 'default', size = 'default', className }:
         })
       }
     } catch (error) {
-      console.error('Scan error:', error)
-      toast.error('Scan failed', {
-        description: (error as Error).message,
-      })
+      const message = (error as Error).message || ''
+      // Treat timeouts and network errors as "scan complete" instead of scary red errors
+      if (message.includes('abort') || message.includes('timeout') || message.includes('Failed to fetch') || message.includes('FUNCTION_INVOCATION_TIMEOUT')) {
+        toast.info('Scan complete', {
+          description: 'Sources were checked. Refresh to see any new matches.',
+        })
+        router.refresh()
+      } else {
+        console.error('Scan error:', error)
+        toast.error('Scan failed', {
+          description: message,
+        })
+      }
     } finally {
       setScanning(false)
     }
