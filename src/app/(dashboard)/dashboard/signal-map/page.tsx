@@ -55,9 +55,11 @@ export default function SignalMapPage() {
       const data = await res.json()
 
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to generate report')
+        console.error('[Signal Map] API error:', { status: res.status, data })
+        throw new Error(data.error || `API returned ${res.status}`)
       }
 
+      console.log('[Signal Map] Report generated:', data.report)
       setReport(data.report)
       toast.success('Signal Map generated successfully!')
     } catch (error: any) {

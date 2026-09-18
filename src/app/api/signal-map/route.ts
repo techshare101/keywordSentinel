@@ -48,7 +48,22 @@ export async function POST(req: NextRequest) {
   }
 
   const results = await Promise.allSettled(
-    connectors.map(connector => connector.fetch(input))
+    connectors.map(async (connector) => {
+      try {
+        console.log(`[Signal Map] Running connector: ${connector.id}`)
+        const result = await connector.fetch(input)
+        console.log(`[Signal Map] Connector ${connector.id} completed:`, {
+          status: result.status,
+          sections: result.section_type,
+          sources_count: result.sources.length,
+          raw_fetches_count: result.raw_fetches.length,
+        })
+        return result
+      } catch (error) {
+        console.error(`[Signal Map] Connector ${connector.id} failed:`, error)
+        throw error
+      }
+    })
   )
 
   // Store raw fetches and sections
