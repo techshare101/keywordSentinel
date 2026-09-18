@@ -85,6 +85,23 @@ export interface AIAnswerEntry {
   fetched_at: string
 }
 
+export interface IndustryHub {
+  domain: string
+  title: string
+  description: string
+  mention_count: number
+  source_urls: string[]
+  category: 'resource' | 'community' | 'news' | 'tool' | 'vendor' | 'other'
+}
+
+export interface TechStackItem {
+  name: string
+  category: 'cms' | 'analytics' | 'crm' | 'ecommerce' | 'advertising' | 'cdn' | 'framework' | 'other'
+  confidence: 'high' | 'medium' | 'low'
+  detected_on: string[]
+  evidence: string
+}
+
 // ---- Connector interface ----
 
 export interface SignalConnectorInput {

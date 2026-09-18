@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Radar, Sparkles, Globe, MessageCircle, Bot, Loader2 } from 'lucide-react'
+import { Radar, Sparkles, Globe, MessageCircle, Bot, Loader2, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -249,64 +249,52 @@ export default function SignalMapPage() {
                   <div className="space-y-6">
                     {/* Business Mentions Summary */}
                     {mentions.top_mentioned && mentions.top_mentioned.length > 0 && (
-                      <div className="p-4 bg-gradient-to-br from-cyan-500/10 to-purple-600/10 rounded-lg border border-cyan-500/20">
-                        <h3 className="font-semibold text-cyan-400 mb-3">
-                          Most Mentioned Businesses
-                        </h3>
+                      <div className="p-4 bg-slate-950/50 rounded-lg border border-cyan-900/30">
+                        <h4 className="font-semibold text-cyan-400 mb-3">Top Mentioned Businesses</h4>
                         <div className="space-y-2">
-                          {mentions.top_mentioned.slice(0, 5).map((m: any, i: number) => (
-                            <div key={i} className="flex items-center justify-between">
-                              <span className="text-slate-200">{m.name}</span>
-                              <span className="text-sm text-slate-400">
-                                {m.count} mentions • {m.engines.join(', ')}
-                              </span>
+                          {mentions.top_mentioned.slice(0, 10).map((mention: any, i: number) => (
+                            <div key={i} className="flex items-center justify-between text-sm">
+                              <span className="text-slate-200">{mention.name}</span>
+                              <div className="flex items-center gap-3">
+                                <span className="text-slate-400">{mention.count} mentions</span>
+                                <div className="flex gap-1">
+                                  {mention.engines.map((engine: string, j: number) => (
+                                    <span key={j} className="px-2 py-0.5 bg-cyan-900/20 text-cyan-400 rounded text-xs">
+                                      {engine}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
                             </div>
                           ))}
                         </div>
                       </div>
                     )}
 
-                    {/* Seed Domain Visibility */}
-                    {mentions.seed_domain_visibility && mentions.seed_domain_visibility.length > 0 && (
-                      <div className="p-4 bg-slate-950/50 rounded-lg border border-slate-800">
-                        <h3 className="font-semibold text-slate-200 mb-3">
-                          Your Domain Visibility
-                        </h3>
-                        <div className="space-y-2">
-                          {mentions.seed_domain_visibility.map((d: any, i: number) => (
-                            <div key={i} className="flex items-center justify-between">
-                              <span className="text-slate-300">{d.domain}</span>
-                              <span className={`text-sm font-medium ${
-                                d.mentioned ? 'text-emerald-400' : 'text-red-400'
-                              }`}>
-                                {d.mentioned ? '✓ Mentioned' : '✗ Not mentioned'}
-                              </span>
+                    {/* AI Responses */}
+                    <div className="space-y-3">
+                      {queries.slice(0, 5).map((query: any, i: number) => (
+                        <details key={i} className="group">
+                          <summary className="p-3 bg-slate-950/50 rounded-lg border border-slate-800 cursor-pointer hover:border-cyan-900/50">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <span className="text-sm font-medium text-cyan-400">{query.engine}</span>
+                                <span className="text-slate-400 text-sm ml-2">• {query.query}</span>
+                              </div>
+                              <span className="text-slate-500 group-open:hidden">▼</span>
+                              <span className="text-slate-500 hidden group-open:inline">▲</span>
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Sample Queries */}
-                    <div>
-                      <h3 className="font-semibold text-slate-200 mb-3">
-                        Sample AI Responses
-                      </h3>
-                      <div className="space-y-3">
-                        {queries.slice(0, 3).map((q: any, i: number) => (
-                          <details key={i} className="p-3 bg-slate-950/50 rounded-lg border border-slate-800">
-                            <summary className="cursor-pointer text-sm font-medium text-slate-300 mb-2">
-                              {q.engine.toUpperCase()}: {q.query}
-                            </summary>
-                            <div className="mt-3 pt-3 border-t border-slate-800">
-                              <p className="text-sm text-slate-400 whitespace-pre-wrap">
-                                {q.response.slice(0, 500)}
-                                {q.response.length > 500 && '...'}
-                              </p>
-                            </div>
-                          </details>
-                        ))}
-                      </div>
+                          </summary>
+                          <div className="p-4 mt-2 bg-slate-950/80 rounded-lg border border-slate-800">
+                            <p className="text-sm text-slate-300 whitespace-pre-wrap">{query.response}</p>
+                          </div>
+                        </details>
+                      ))}
+                      {queries.length > 5 && (
+                        <p className="text-sm text-slate-500 text-center">
+                          +{queries.length - 5} more AI responses
+                        </p>
+                      )}
                     </div>
                   </div>
                 )
@@ -314,6 +302,123 @@ export default function SignalMapPage() {
             </SectionCard>
           )}
 
+          {/* Section: Industry Hubs */}
+          {report.sections.find(s => s.section_type === 'industry_hubs') && (
+            <SectionCard
+              title="Industry Hubs"
+              icon={<Globe className="h-5 w-5" />}
+              section={report.sections.find(s => s.section_type === 'industry_hubs')!}
+            >
+              {section => {
+                const hubs = section.data.hubs || []
+                if (hubs.length === 0) {
+                  return <EmptyState message="No industry hubs found" />
+                }
+                return (
+                  <div className="space-y-3">
+                    {hubs.slice(0, 15).map((hub: any, i: number) => (
+                      <div key={i} className="p-4 bg-slate-950/50 rounded-lg border border-slate-800">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1">
+                            <a
+                              href={`https://${hub.domain}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="font-semibold text-cyan-400 hover:underline"
+                            >
+                              {hub.domain}
+                            </a>
+                            <p className="text-sm text-slate-400 mt-1">{hub.description}</p>
+                          </div>
+                          <div className="flex flex-col items-end gap-1">
+                            <span className="px-2 py-0.5 bg-cyan-900/20 text-cyan-400 rounded text-xs">
+                              {hub.category}
+                            </span>
+                            <span className="text-xs text-slate-500">
+                              {hub.mention_count} mention{hub.mention_count > 1 ? 's' : ''}
+                            </span>
+                          </div>
+                        </div>
+                        {hub.source_urls.length > 0 && (
+                          <div className="mt-2 pt-2 border-t border-slate-800">
+                            <span className="text-xs text-slate-500">
+                              Found on: {hub.source_urls.map((url: string) => new URL(url).hostname).join(', ')}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    {hubs.length > 15 && (
+                      <p className="text-sm text-slate-500 text-center">
+                        +{hubs.length - 15} more hubs
+                      </p>
+                    )}
+                  </div>
+                )
+              }}
+            </SectionCard>
+          )}
+
+          {/* Section: Tech Stack */}
+          {report.sections.find(s => s.section_type === 'tech_stack') && (
+            <SectionCard
+              title="Tech Stack"
+              icon={<Zap className="h-5 w-5" />}
+              section={report.sections.find(s => s.section_type === 'tech_stack')!}
+            >
+              {section => {
+                const stack = section.data.stack || []
+                if (stack.length === 0) {
+                  return <EmptyState message="No technologies detected" />
+                }
+
+                const byCategory = stack.reduce((acc: any, tech: any) => {
+                  if (!acc[tech.category]) acc[tech.category] = []
+                  acc[tech.category].push(tech)
+                  return acc
+                }, {})
+
+                return (
+                  <div className="space-y-4">
+                    {Object.entries(byCategory).map(([category, techs]: [string, any]) => (
+                      <div key={category}>
+                        <h4 className="text-sm font-semibold text-slate-400 uppercase mb-2">
+                          {category}
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {techs.map((tech: any, i: number) => (
+                            <div key={i} className="p-3 bg-slate-950/50 rounded-lg border border-slate-800">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="font-medium text-slate-200">{tech.name}</span>
+                                <span className={`px-2 py-0.5 rounded text-xs ${
+                                  tech.confidence === 'high' 
+                                    ? 'bg-green-900/20 text-green-400' 
+                                    : tech.confidence === 'medium'
+                                    ? 'bg-yellow-900/20 text-yellow-400'
+                                    : 'bg-slate-700 text-slate-400'
+                                }`}>
+                                  {tech.confidence}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-500">{tech.evidence}</p>
+                              <div className="mt-2 flex flex-wrap gap-1">
+                                {tech.detected_on.map((domain: string, j: number) => (
+                                  <span key={j} className="px-2 py-0.5 bg-slate-800 text-slate-400 rounded text-xs">
+                                    {domain}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              }}
+            </SectionCard>
+          )}
+          
           {/* Sources Footer */}
           <div className="text-xs text-slate-500 text-center pt-6 border-t border-slate-800">
             Generated {new Date(report.created_at).toLocaleString()} • 
