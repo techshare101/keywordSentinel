@@ -30,6 +30,10 @@ interface EngineClaim {
 interface Claim {
   question: string
   check: string
+  evidence: 'full' | 'thin'
+  engines_answered: number
+  engines_attempted: number
+  decisive_engine: string | null
   status: ClaimStatus
   reason: string
   engines: EngineClaim[]
@@ -58,6 +62,8 @@ interface Report {
   claims: Claim[]
   engine_status: EngineStatus[]
   working_engines: number
+  min_engines_for_finding: number
+  thin_claims: number
   report_grade: 'reportable' | 'probe_only'
   sellable_findings: number
   completed_at: string
@@ -351,7 +357,16 @@ export default function ClinicCheckPage() {
             </div>
 
             <div>
-              <div className="text-xs uppercase tracking-wide text-slate-500 mb-2">Findings</div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-xs uppercase tracking-wide text-slate-500">
+                  Findings <span className="text-slate-600">\u00b7 corroborated by {report.min_engines_for_finding}+ engines</span>
+                </div>
+                {report.thin_claims > 0 && (
+                  <div className="text-xs text-amber-400/80">
+                    {report.thin_claims} claim(s) too thin to count
+                  </div>
+                )}
+              </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {FINDING_TILES.map((k) => {
                   const cfg = STATUS_CONFIG[k]
@@ -396,6 +411,11 @@ export default function ClinicCheckPage() {
                           {claim.check && (
                             <span className="px-2 py-0.5 rounded-md text-[10px] border border-slate-700 text-slate-500 uppercase tracking-wide">
                               {claim.check.replace(/_/g, ' ')}
+                            </span>
+                          )}
+                          {claim.evidence === 'thin' && claim.engines_answered > 0 && (
+                            <span className="px-2 py-0.5 rounded-md text-[10px] border border-amber-500/30 text-amber-400">
+                              thin \u2014 {claim.engines_answered}/{claim.engines_attempted} engines
                             </span>
                           )}
                           {claim.engines.length > 1 && (

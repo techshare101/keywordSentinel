@@ -44,6 +44,12 @@ const VERTICAL_ALL_SERVICES: string[] = Array.from(
   new Set(Object.values(VERTICALS).flatMap((v) => v.services))
 )
 
+/** A finding needs corroboration from at least this many engines to be
+ *  presentable. Below it the claim is reported but marked thin, and it is
+ *  excluded from the findings tiles so the same inputs cannot produce
+ *  different headline numbers run to run. */
+const MIN_ENGINES_FOR_FINDING = 2
+
 const SEVERITY: ClaimStatus[] = [
   'contradiction',
   'foreign_source',
@@ -53,6 +59,11 @@ const SEVERITY: ClaimStatus[] = [
   'partial',
   'cant_confirm',
   'confirmed',
+]
+
+/** Verdicts that are presented to a business owner as findings. */
+const FINDING_STATUSES: ClaimStatus[] = [
+  'contradiction', 'foreign_source', 'source_conflict', 'unsupported', 'not_named',
 ]
 
 function worst(statuses: ClaimStatus[]): ClaimStatus {
@@ -77,7 +88,35 @@ class HttpError extends Error {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-async function withRetry<T>(fn: () => Promise<T>, attempts = 3, base = 1000): Promise<T> {
+/**
+ * Run tasks with bounded concurrency and a stagger between starts.
+ *
+ * Firing every question at one engine simultaneously is what produced
+ * "Perplexity 3/7": the burst trips per-second rate limits, and retrying
+ * inside the same burst trips them again. Two at a time, staggered, is
+ * slower per run and dramatically more complete.
+ */
+async function mapLimit<T, R>(
+  items: T[],
+  limit: number,
+  staggerMs: number,
+  fn: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+  const results = new Array<R>(items.length)
+  let cursor = 0
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async (_, w) => {
+    await sleep(w * staggerMs)
+    while (cursor < items.length) {
+      const i = cursor++
+      results[i] = await fn(items[i], i)
+      await sleep(staggerMs)
+    }
+  })
+  await Promise.all(workers)
+  return results
+}
+
+async function withRetry<T>(fn: () => Promise<T>, attempts = 4, base = 2000): Promise<T> {
   let lastErr: any
   for (let i = 0; i < attempts; i++) {
     try {
@@ -596,15 +635,13 @@ export async function POST(req: NextRequest) {
     // no longer discards the other five.
     const runs = await Promise.all(
       active.map(async (engine) => {
-        const answers = await Promise.all(
-          questions.map(async (q) => {
-            try {
-              return { ok: true as const, value: await withRetry(() => engine.run(q)) }
-            } catch (err: any) {
-              return { ok: false as const, error: err.message as string, status: err?.status }
-            }
-          })
-        )
+        const answers = await mapLimit(questions, 2, 600, async (q) => {
+          try {
+            return { ok: true as const, value: await withRetry(() => engine.run(q)) }
+          } catch (err: any) {
+            return { ok: false as const, error: err.message as string, status: err?.status }
+          }
+        })
         const okCount = answers.filter((a) => a.ok).length
         const firstErr = answers.find((a) => !a.ok) as any
         return {
@@ -674,6 +711,10 @@ export async function POST(req: NextRequest) {
           question,
           check,
           status: 'cant_confirm' as ClaimStatus,
+          evidence: 'thin' as const,
+          engines_answered: 0,
+          engines_attempted: runs.length,
+          decisive_engine: null,
           reason: 'No engine answered this question.',
           engines: [],
           ai_answer: 'No engine answered this question.',
@@ -684,13 +725,34 @@ export async function POST(req: NextRequest) {
 
       const status = worst(perEngine.map((e) => e.status))
       const decisive = perEngine.find((e) => e.status === status)!
-      summary[status]++
+
+      // Evidence gate: a finding drawn from one engine is a probe, not a
+      // finding. It is still shown, with the engine named, but it does not
+      // move the headline counts.
+      const isFinding = FINDING_STATUSES.includes(status)
+      const evidence: 'full' | 'thin' =
+        perEngine.length >= MIN_ENGINES_FOR_FINDING ? 'full' : 'thin'
+
+      if (!isFinding || evidence === 'full') {
+        summary[status]++
+      } else {
+        summary.cant_confirm++
+      }
 
       return {
         question,
         check,
         status,
-        reason: decisive.reason,
+        evidence,
+        engines_answered: perEngine.length,
+        engines_attempted: runs.length,
+        // Named so a thin finding can be read honestly: "OpenAI said X,
+        // the other engines did not answer."
+        decisive_engine: decisive.engine,
+        reason:
+          evidence === 'thin' && isFinding
+            ? `${decisive.reason} (only ${decisive.engine} answered — not corroborated)`
+            : decisive.reason,
         engines: perEngine,
         agreement: new Set(perEngine.map((e) => e.status)).size === 1,
         // back-compat fields for the existing UI
@@ -728,7 +790,13 @@ export async function POST(req: NextRequest) {
       working_engines: workingEngines,
       // A single engine is a probe, not a report. The UI must not present
       // absence or contradiction findings to a clinic on one engine alone.
-      report_grade: workingEngines >= 2 ? 'reportable' : 'probe_only',
+      report_grade:
+        claims.filter((c: any) => c.engines_answered >= MIN_ENGINES_FOR_FINDING).length >=
+        Math.ceil(claims.length / 2)
+          ? 'reportable'
+          : 'probe_only',
+      min_engines_for_finding: MIN_ENGINES_FOR_FINDING,
+      thin_claims: claims.filter((c: any) => c.evidence === 'thin').length,
       sellable_findings: sellable,
       summary,
       completed_at: new Date().toISOString(),
