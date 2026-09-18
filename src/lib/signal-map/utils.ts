@@ -25,6 +25,7 @@ export async function fetchWithTimeout(
  * Extract a clean, short search query from a structured ICP description.
  * Handles formats like:
  *   "Bio search: X. Website search: Y. Keyword search: Z"
+ *   "Keyword search: medical spa marketing — surfaces the keywords..."
  *   "med spa owner or aesthetic injector"
  * Returns a query suitable for Reddit, YouTube, Spotify, AI engines.
  */
@@ -35,21 +36,22 @@ export function extractSearchQuery(icp_description: string, maxLength: number = 
     .trim()
 
   // Try to extract the "Keyword search:" portion first
-  const keywordMatch = text.match(/keyword search[:\-]?\s*([^\.\n]+)/i)
+  const keywordMatch = text.match(/keyword search[:\-]?\s*([^\.\n\—\–\-]+)/i)
   if (keywordMatch) {
     return keywordMatch[1].trim().slice(0, maxLength)
   }
 
   // Try "Bio search:" portion
-  const bioMatch = text.match(/bio search[:\-]?\s*([^\.\n]+)/i)
+  const bioMatch = text.match(/bio search[:\-]?\s*([^\.\n\—\–\-]+)/i)
   if (bioMatch) {
     return bioMatch[1].trim().slice(0, maxLength)
   }
 
-  // Fallback: first sentence, truncated
+  // Fallback: first sentence (stop at em dash, en dash, or hyphen if no period), truncated
   const firstSentence = text.split(/[\.!?]/)[0].trim()
-  if (firstSentence.length > 10) {
-    return firstSentence.slice(0, maxLength)
+  const cleanSentence = firstSentence.split(/[\—\–]/)[0].trim()
+  if (cleanSentence.length > 10) {
+    return cleanSentence.slice(0, maxLength)
   }
 
   return text.slice(0, maxLength)

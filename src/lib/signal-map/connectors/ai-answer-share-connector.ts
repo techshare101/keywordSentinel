@@ -46,22 +46,26 @@ export class AIAnswerShareConnector implements SignalConnector {
 
     const queries = this.generateQueries(icp_description, seed_domains)
 
-    for (const query of queries.slice(0, 10)) {
-      const openaiResult = await this.queryOpenAI(query, report_id)
+    for (const query of queries.slice(0, 4)) {
+      // Run all three AI engines in parallel for speed
+      const [openaiResult, perplexityResult, geminiResult] = await Promise.all([
+        this.queryOpenAI(query, report_id),
+        this.queryPerplexity(query, report_id),
+        this.queryGemini(query, report_id),
+      ])
+
       if (openaiResult) {
         answers.push(openaiResult.answer)
         rawFetches.push(openaiResult.rawFetch)
         sources.push(openaiResult.source)
       }
 
-      const perplexityResult = await this.queryPerplexity(query, report_id)
       if (perplexityResult) {
         answers.push(perplexityResult.answer)
         rawFetches.push(perplexityResult.rawFetch)
         sources.push(perplexityResult.source)
       }
 
-      const geminiResult = await this.queryGemini(query, report_id)
       if (geminiResult) {
         answers.push(geminiResult.answer)
         rawFetches.push(geminiResult.rawFetch)

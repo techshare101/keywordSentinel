@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Radar, Sparkles, Globe, MessageCircle, Bot, Loader2, Zap, Headphones, Youtube, ExternalLink } from 'lucide-react'
 
 function formatNumber(num: number): string {
@@ -74,6 +74,28 @@ export default function SignalMapPage() {
       setLoading(false)
     }
   }
+
+  // Poll for report updates while status is running
+  useEffect(() => {
+    if (!report || report.status !== 'running') return
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/signal-map?id=${report.id}`)
+        if (!res.ok) return
+
+        const data = await res.json()
+        if (data.report && data.report.status !== report.status) {
+          console.log('[Signal Map] Report updated:', data.report.status)
+          setReport(data.report)
+        }
+      } catch (error) {
+        console.error('[Signal Map] Polling error:', error)
+      }
+    }, 3000)
+
+    return () => clearInterval(interval)
+  }, [report])
 
   return (
     <div className="space-y-6">
@@ -160,24 +182,24 @@ export default function SignalMapPage() {
               section={report.sections.find(s => s.section_type === 'discussion_venues')!}
             >
               {section => {
-                const subreddits = section.data.subreddits || []
-                if (subreddits.length === 0) {
+                const venues = section.data.venues || []
+                if (venues.length === 0) {
                   return <EmptyState message="No discussion venues found" />
                 }
                 return (
                   <div className="space-y-4">
-                    {subreddits.map((sub: any, i: number) => (
+                    {venues.map((venue: any, i: number) => (
                       <div key={i} className="p-4 bg-slate-950/50 rounded-lg border border-slate-800">
                         <div className="flex items-center justify-between mb-3">
                           <h3 className="font-semibold text-cyan-400">
-                            r/{sub.subreddit}
+                            r/{venue.subreddit}
                           </h3>
                           <div className="text-sm text-slate-400">
-                            {sub.post_count} posts • avg score {sub.avg_score}
+                            {venue.post_count} posts • avg score {venue.avg_score}
                           </div>
                         </div>
                         <div className="space-y-2">
-                          {sub.top_posts.slice(0, 3).map((post: any, j: number) => (
+                          {venue.top_posts.slice(0, 3).map((post: any, j: number) => (
                             <a
                               key={j}
                               href={post.url}
