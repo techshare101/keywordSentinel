@@ -4,6 +4,8 @@ import { QuestionMiningConnector } from './question-mining-connector'
 import { AIAnswerShareConnector } from './ai-answer-share-connector'
 import { IndustryHubsConnector } from './industry-hubs-connector'
 import { TechStackConnector } from './tech-stack-connector'
+import { PodcastsConnector } from './podcasts-connector'
+import { YouTubeChannelsConnector } from './youtube-channels-connector'
 
 // Connector registry — all active connectors run in parallel
 export const signalConnectors: SignalConnector[] = [
@@ -12,9 +14,8 @@ export const signalConnectors: SignalConnector[] = [
   new AIAnswerShareConnector(),
   new IndustryHubsConnector(),
   new TechStackConnector(),
-  // Phase 3 connectors (coming soon)
-  // new PodcastsConnector(),
-  // new YouTubeChannelsConnector(),
+  new PodcastsConnector(),
+  new YouTubeChannelsConnector(),
 ]
 
 export function getConnector(sectionType: string): SignalConnector | undefined {

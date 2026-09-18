@@ -1,7 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { Radar, Sparkles, Globe, MessageCircle, Bot, Loader2, Zap } from 'lucide-react'
+import { Radar, Sparkles, Globe, MessageCircle, Bot, Loader2, Zap, Headphones, Youtube, ExternalLink } from 'lucide-react'
+
+function formatNumber(num: number): string {
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M'
+  if (num >= 1000) return (num / 1000).toFixed(1) + 'K'
+  return num.toString()
+}
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -418,7 +424,114 @@ export default function SignalMapPage() {
               }}
             </SectionCard>
           )}
-          
+
+          {/* Podcasts */}
+          {report.sections.find(s => s.section_type === 'podcasts') && (
+            <SectionCard
+              title="Podcasts"
+              icon={<Headphones className="h-5 w-5" />}
+              section={report.sections.find(s => s.section_type === 'podcasts')!}
+            >
+              {section => {
+                const podcasts = section.data.podcasts || []
+                if (podcasts.length === 0) {
+                  return <EmptyState message="No podcasts found for this ICP" />
+                }
+                return (
+                  <div className="space-y-3">
+                    {podcasts.map((podcast: any, i: number) => (
+                      <a
+                        key={i}
+                        href={podcast.spotify_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block p-4 bg-slate-950/50 rounded-lg border border-slate-800 hover:border-cyan-500/30 transition-colors"
+                      >
+                        <div className="flex gap-4">
+                          {podcast.image_url && (
+                            <img 
+                              src={podcast.image_url} 
+                              alt={podcast.name}
+                              className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
+                            />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold text-slate-200 truncate">{podcast.name}</h3>
+                            {podcast.publisher && (
+                              <p className="text-sm text-slate-400 truncate">{podcast.publisher}</p>
+                            )}
+                            <p className="text-sm text-slate-500 mt-1 line-clamp-2">{podcast.description}</p>
+                            {podcast.total_episodes && (
+                              <p className="text-xs text-slate-600 mt-2">
+                                {podcast.total_episodes} episodes
+                                {podcast.language && ` • ${podcast.language.toUpperCase()}`}
+                              </p>
+                            )}
+                          </div>
+                          <ExternalLink className="h-5 w-5 text-slate-600 flex-shrink-0" />
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                )
+              }}
+            </SectionCard>
+          )}
+
+          {/* YouTube Channels */}
+          {report.sections.find(s => s.section_type === 'youtube_channels') && (
+            <SectionCard
+              title="YouTube Channels"
+              icon={<Youtube className="h-5 w-5" />}
+              section={report.sections.find(s => s.section_type === 'youtube_channels')!}
+            >
+              {section => {
+                const channels = section.data.channels || []
+                if (channels.length === 0) {
+                  return <EmptyState message="No YouTube channels found for this ICP" />
+                }
+                return (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {channels.map((channel: any, i: number) => (
+                      <a
+                        key={i}
+                        href={channel.channel_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block p-4 bg-slate-950/50 rounded-lg border border-slate-800 hover:border-cyan-500/30 transition-colors"
+                      >
+                        <div className="flex items-start gap-3">
+                          {channel.thumbnail_url && (
+                            <img 
+                              src={channel.thumbnail_url} 
+                              alt={channel.name}
+                              className="w-12 h-12 rounded-full object-cover flex-shrink-0"
+                            />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-semibold text-slate-200 truncate">{channel.name}</h3>
+                            {channel.description && (
+                              <p className="text-sm text-slate-500 mt-1 line-clamp-2">{channel.description}</p>
+                            )}
+                            <div className="flex items-center gap-3 mt-2 text-xs text-slate-600">
+                              {channel.subscriber_count && (
+                                <span>{formatNumber(channel.subscriber_count)} subscribers</span>
+                              )}
+                              {channel.video_count && (
+                                <span>{formatNumber(channel.video_count)} videos</span>
+                              )}
+                            </div>
+                          </div>
+                          <ExternalLink className="h-5 w-5 text-slate-600 flex-shrink-0 mt-1" />
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                )
+              }}
+            </SectionCard>
+          )}
+
           {/* Sources Footer */}
           <div className="text-xs text-slate-500 text-center pt-6 border-t border-slate-800">
             Generated {new Date(report.created_at).toLocaleString()} • 

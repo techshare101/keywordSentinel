@@ -102,6 +102,26 @@ export interface TechStackItem {
   evidence: string
 }
 
+export interface Podcast {
+  name: string
+  publisher?: string
+  description: string
+  spotify_url: string
+  total_episodes?: number
+  language?: string
+  image_url?: string
+}
+
+export interface YouTubeChannel {
+  channel_id: string
+  name: string
+  description?: string
+  subscriber_count?: number
+  video_count?: number
+  channel_url: string
+  thumbnail_url?: string
+}
+
 // ---- Connector interface ----
 
 export interface SignalConnectorInput {
