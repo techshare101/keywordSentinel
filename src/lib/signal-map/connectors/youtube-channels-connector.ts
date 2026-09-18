@@ -3,6 +3,28 @@ import { fetchWithTimeout } from '../utils'
 
 const TREG_URL = 'https://treg.to'
 
+function extractSearchQuery(icp_description: string): string {
+  // Take first 150 chars of ICP description, removing newlines and extra spaces
+  // YouTube API has a 200 char limit on keyword
+  return icp_description
+    .replace(/\n/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 150)
+}
+
+function parseSubscriberCount(text: string | undefined): number | undefined {
+  if (!text) return undefined
+  // Parse strings like "2.24K subscribers", "1.5M subscribers", "500 subscribers"
+  const match = text.toLowerCase().match(/([\d.]+)\s*(k|m)?/)
+  if (!match) return undefined
+  const num = parseFloat(match[1])
+  const suffix = match[2]
+  if (suffix === 'k') return Math.round(num * 1000)
+  if (suffix === 'm') return Math.round(num * 1000000)
+  return Math.round(num)
+}
+
 export class YouTubeChannelsConnector implements SignalConnector {
   id = 'youtube_channels'
   name = 'YouTube Channels'
@@ -23,12 +45,13 @@ export class YouTubeChannelsConnector implements SignalConnector {
       }
     }
 
+    const query = extractSearchQuery(icp_description)
     const endpoint = 'tikhub.x.youtube-web-v2-search-channels'
-    const requestUrl = `${TREG_URL}/call/${endpoint}?keyword=${encodeURIComponent(icp_description)}&need_format=true`
+    const requestUrl = `${TREG_URL}/call/${endpoint}?keyword=${encodeURIComponent(query)}&need_format=true`
     const startTime = Date.now()
 
     try {
-      console.log(`[YouTubeChannelsConnector] Searching YouTube for: ${icp_description}`)
+      console.log(`[YouTubeChannelsConnector] Searching YouTube for: ${query}`)
       const response = await fetchWithTimeout(requestUrl, {
         method: 'GET',
         headers: { 'X-Treg-Token': token },
@@ -49,7 +72,7 @@ export class YouTubeChannelsConnector implements SignalConnector {
             connector_id: this.id,
             source: 'treg/youtube',
             request_url: requestUrl,
-            request_params: { keyword: icp_description },
+            request_params: { keyword: query },
             response_body: result,
             response_status: response.status,
             latency_ms: latencyMs,
@@ -60,13 +83,13 @@ export class YouTubeChannelsConnector implements SignalConnector {
 
       const rawChannels = result?.data?.channels || []
       const channels: YouTubeChannel[] = rawChannels.slice(0, 20).map((ch: any) => ({
-        channel_id: ch.channel_id || ch.channelId || ch.id || '',
-        name: ch.name || ch.title || ch.channel_title || 'Unknown',
+        channel_id: ch.channel_id || '',
+        name: ch.title || 'Unknown',
         description: (ch.description || '').slice(0, 200),
-        subscriber_count: ch.subscriber_count || ch.subscribers || ch.subscriberCountText,
-        video_count: ch.video_count || ch.videoCount || ch.videos,
-        channel_url: ch.channel_url || `https://www.youtube.com/channel/${ch.channel_id || ch.channelId || ch.id}`,
-        thumbnail_url: ch.thumbnail?.[0]?.url || ch.avatar?.[0]?.url || ch.thumbnails?.[0]?.url,
+        subscriber_count: parseSubscriberCount(ch.subscriber_count_text),
+        video_count: ch.video_count,
+        channel_url: ch.channel_url || `https://www.youtube.com/channel/${ch.channel_id}`,
+        thumbnail_url: ch.thumbnails?.[0]?.url ? `https:${ch.thumbnails[0].url}` : undefined,
       }))
 
       return {
@@ -76,7 +99,7 @@ export class YouTubeChannelsConnector implements SignalConnector {
         sources: [{
           source: 'youtube',
           url: 'https://www.youtube.com',
-          description: `YouTube channel search for "${icp_description}"`,
+          description: `YouTube channel search for "${query}"`,
           fetched_at: new Date().toISOString(),
         }],
         raw_fetches: [{
@@ -84,7 +107,7 @@ export class YouTubeChannelsConnector implements SignalConnector {
           connector_id: this.id,
           source: 'treg/youtube',
           request_url: requestUrl,
-          request_params: { keyword: icp_description },
+          request_params: { keyword: query },
           response_body: { channel_count: rawChannels.length },
           response_status: response.status,
           latency_ms: latencyMs,
@@ -102,7 +125,7 @@ export class YouTubeChannelsConnector implements SignalConnector {
           connector_id: this.id,
           source: 'treg/youtube',
           request_url: requestUrl,
-          request_params: { keyword: icp_description },
+          request_params: { keyword: query },
           response_body: { error: String(error) },
           response_status: 500,
           latency_ms: Date.now() - startTime,

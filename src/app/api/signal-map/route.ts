@@ -38,6 +38,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to create report' }, { status: 500 })
   }
 
+  let finalStatus = 'failed'
+  let functionError: string | null = null
+
   // Run all connectors in parallel with global error handling
   try {
     // Run all connectors in parallel
@@ -138,7 +141,6 @@ export async function POST(req: NextRequest) {
     }
 
     // Determine final status
-    let finalStatus: string
     if (errorCount === connectors.length) {
       finalStatus = 'failed'
     } else if (errorCount > 0 || noDataCount > 0) {
@@ -147,43 +149,50 @@ export async function POST(req: NextRequest) {
       finalStatus = 'completed'
     }
 
-    // Update report status
-    await supabase
-      .from('signal_reports')
-      .update({
-        status: finalStatus,
-        completed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', report.id)
-
-    console.log(`[Signal Map] Report ${report.id} completed with status: ${finalStatus}`)
+    console.log(`[Signal Map] Report ${report.id} determined final status: ${finalStatus}`)
   } catch (error) {
     console.error('[Signal Map] Fatal error during report generation:', error)
-    
-    // Always update report status to failed on any error
-    await supabase
-      .from('signal_reports')
-      .update({
-        status: 'failed',
-        error_message: error instanceof Error ? error.message : 'Unknown error',
-        completed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', report.id)
+    finalStatus = 'failed'
+    functionError = error instanceof Error ? error.message : 'Unknown error'
+  }
 
+  // Always update report status (outside try/catch so it always runs)
+  console.log(`[Signal Map] Updating report ${report.id} status to ${finalStatus}`)
+  const { error: statusUpdateError } = await supabase
+    .from('signal_reports')
+    .update({
+      status: finalStatus,
+      error_message: functionError,
+      completed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', report.id)
+
+  if (statusUpdateError) {
+    console.error(`[Signal Map] CRITICAL: Failed to update report ${report.id} status:`, statusUpdateError)
+  }
+
+  if (finalStatus === 'failed') {
     return NextResponse.json({ 
       error: 'Failed to generate report',
-      details: error instanceof Error ? error.message : 'Unknown error'
+      details: functionError || 'Unknown error'
     }, { status: 500 })
   }
 
   // Fetch the full report with sections
-  const { data: fullReport } = await supabase
+  const { data: fullReport, error: fetchError } = await supabase
     .from('signal_reports')
     .select('*, sections:signal_sections(*)')
     .eq('id', report.id)
     .single()
+
+  if (fetchError) {
+    console.error(`[Signal Map] Failed to fetch full report ${report.id}:`, fetchError)
+    return NextResponse.json({ 
+      error: 'Report generated but failed to fetch results',
+      report_id: report.id
+    }, { status: 500 })
+  }
 
   return NextResponse.json({ report: fullReport })
 }

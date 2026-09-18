@@ -1,7 +1,16 @@
 import type { SignalConnector, SignalConnectorInput, SignalConnectorResult, Podcast } from '@/types/signal-map'
-import { fetchWithTimeout, truncateForStorage } from '../utils'
+import { fetchWithTimeout } from '../utils'
 
 const TREG_URL = 'https://treg.to'
+
+function extractSearchQuery(icp_description: string): string {
+  // Take first 150 chars of ICP description, removing newlines and extra spaces
+  return icp_description
+    .replace(/\n/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 150)
+}
 
 export class PodcastsConnector implements SignalConnector {
   id = 'podcasts'
@@ -23,12 +32,13 @@ export class PodcastsConnector implements SignalConnector {
       }
     }
 
+    const query = extractSearchQuery(icp_description)
     const endpoint = 'scrapecreators.x.v1-spotify-search'
-    const requestUrl = `${TREG_URL}/call/${endpoint}?query=${encodeURIComponent(icp_description)}`
+    const requestUrl = `${TREG_URL}/call/${endpoint}?query=${encodeURIComponent(query)}&type=podcasts`
     const startTime = Date.now()
 
     try {
-      console.log(`[PodcastsConnector] Searching Spotify for: ${icp_description}`)
+      console.log(`[PodcastsConnector] Searching Spotify for: ${query}`)
       const response = await fetchWithTimeout(requestUrl, {
         method: 'GET',
         headers: { 'X-Treg-Token': token },
@@ -49,25 +59,25 @@ export class PodcastsConnector implements SignalConnector {
             connector_id: this.id,
             source: 'treg/spotify',
             request_url: requestUrl,
-            request_params: { query: icp_description },
+            request_params: { query, type: 'podcasts' },
             response_body: result,
             response_status: response.status,
-            latency_ms: Date.now() - startTime,
+            latency_ms: latencyMs,
           }],
           error_message: `treg API error: ${response.status}`,
         }
       }
 
-      // Spotify search returns shows/podcasts
-      const shows = result?.data?.shows?.items || result?.shows?.items || result?.data?.episodes?.items || []
+      // Spotify search returns podcasts at top level
+      const shows = result?.podcasts || []
       const podcasts: Podcast[] = shows.slice(0, 20).map((show: any) => ({
-        name: show.name || show.title || 'Unknown',
-        publisher: show.publisher,
+        name: show.name || 'Unknown',
+        publisher: show.publisher?.name,
         description: (show.description || '').slice(0, 200),
-        spotify_url: show.external_urls?.spotify || `https://open.spotify.com/show/${show.id}`,
+        spotify_url: show.uri ? `https://open.spotify.com/show/${show.uri.replace('spotify:show:', '')}` : '',
         total_episodes: show.total_episodes,
-        language: show.languages?.[0],
-        image_url: show.images?.[0]?.url,
+        language: show.language,
+        image_url: show.coverArt?.sources?.[0]?.url,
       }))
 
       return {
@@ -77,7 +87,7 @@ export class PodcastsConnector implements SignalConnector {
         sources: [{
           source: 'spotify',
           url: 'https://open.spotify.com',
-          description: `Spotify podcast search for "${icp_description}"`,
+          description: `Spotify podcast search for "${query}"`,
           fetched_at: new Date().toISOString(),
         }],
         raw_fetches: [{
@@ -85,7 +95,7 @@ export class PodcastsConnector implements SignalConnector {
           connector_id: this.id,
           source: 'treg/spotify',
           request_url: requestUrl,
-          request_params: { query: icp_description },
+          request_params: { query, type: 'podcasts' },
           response_body: { show_count: shows.length },
           response_status: response.status,
           latency_ms: latencyMs,
@@ -103,7 +113,7 @@ export class PodcastsConnector implements SignalConnector {
           connector_id: this.id,
           source: 'treg/spotify',
           request_url: requestUrl,
-          request_params: { query: icp_description },
+          request_params: { query, type: 'podcasts' },
           response_body: { error: String(error) },
           response_status: 500,
           latency_ms: Date.now() - startTime,
