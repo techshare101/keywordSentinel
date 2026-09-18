@@ -38,111 +38,145 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to create report' }, { status: 500 })
   }
 
-  // Run all connectors in parallel
-  const connectors = getAllConnectors()
-  const input = {
-    icp_description: icp_description.trim(),
-    seed_domains: report.seed_domains,
-    report_id: report.id,
-    user_id: user.id,
-  }
-
-  const results = await Promise.allSettled(
-    connectors.map(async (connector) => {
-      try {
-        console.log(`[Signal Map] Running connector: ${connector.id}`)
-        const result = await connector.fetch(input)
-        console.log(`[Signal Map] Connector ${connector.id} completed:`, {
-          status: result.status,
-          sections: result.section_type,
-          sources_count: result.sources.length,
-          raw_fetches_count: result.raw_fetches.length,
-        })
-        return result
-      } catch (error) {
-        console.error(`[Signal Map] Connector ${connector.id} failed:`, error)
-        throw error
-      }
-    })
-  )
-
-  // Store raw fetches and sections
-  let completedCount = 0
-  let noDataCount = 0
-  let errorCount = 0
-
-  for (let i = 0; i < results.length; i++) {
-    const result = results[i]
-    const connector = connectors[i]
-
-    if (result.status === 'fulfilled') {
-      const sectionResult = result.value
-
-      // Store raw fetches
-      if (sectionResult.raw_fetches.length > 0) {
-        await supabase
-          .from('signal_raw_fetches')
-          .insert(sectionResult.raw_fetches.map((rf) => ({
-            report_id: report.id,
-            connector_id: connector.id,
-            source: rf.source,
-            request_url: rf.request_url,
-            request_params: rf.request_params,
-            response_body: rf.response_body,
-            response_status: rf.response_status,
-            latency_ms: rf.latency_ms,
-          })))
-      }
-
-      // Store section
-      await supabase
-        .from('signal_sections')
-        .insert({
-          report_id: report.id,
-          section_type: sectionResult.section_type,
-          status: sectionResult.status,
-          data: sectionResult.data,
-          sources: sectionResult.sources,
-          error_message: sectionResult.error_message || null,
-        })
-
-      if (sectionResult.status === 'completed') completedCount++
-      else if (sectionResult.status === 'no_data') noDataCount++
-    } else {
-      // Connector threw an unhandled error
-      await supabase
-        .from('signal_sections')
-        .insert({
-          report_id: report.id,
-          section_type: connector.section_type,
-          status: 'error',
-          data: {},
-          sources: [],
-          error_message: result.reason?.message || 'Unknown error',
-        })
-      errorCount++
+  // Run all connectors in parallel with global error handling
+  try {
+    // Run all connectors in parallel
+    const connectors = getAllConnectors()
+    const input = {
+      icp_description: icp_description.trim(),
+      seed_domains: report.seed_domains,
+      report_id: report.id,
+      user_id: user.id,
     }
-  }
 
-  // Determine final status
-  let finalStatus: string
-  if (errorCount === connectors.length) {
-    finalStatus = 'failed'
-  } else if (errorCount > 0 || noDataCount > 0) {
-    finalStatus = completedCount > 0 ? 'partial' : 'failed'
-  } else {
-    finalStatus = 'completed'
-  }
+    console.log(`[Signal Map] Starting report ${report.id} with ${connectors.length} connectors`)
 
-  // Update report status
-  await supabase
-    .from('signal_reports')
-    .update({
-      status: finalStatus,
-      completed_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', report.id)
+    const results = await Promise.allSettled(
+      connectors.map(async (connector) => {
+        try {
+          console.log(`[Signal Map] Running connector: ${connector.id}`)
+          const result = await connector.fetch(input)
+          console.log(`[Signal Map] Connector ${connector.id} completed:`, {
+            status: result.status,
+            sections: result.section_type,
+            sources_count: result.sources.length,
+            raw_fetches_count: result.raw_fetches.length,
+          })
+          return result
+        } catch (error) {
+          console.error(`[Signal Map] Connector ${connector.id} failed:`, error)
+          throw error
+        }
+      })
+    )
+
+    // Store raw fetches and sections
+    let completedCount = 0
+    let noDataCount = 0
+    let errorCount = 0
+
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i]
+      const connector = connectors[i]
+
+      if (result.status === 'fulfilled') {
+        const sectionResult = result.value
+
+        // Store raw fetches
+        if (sectionResult.raw_fetches.length > 0) {
+          const { error: rawFetchError } = await supabase
+            .from('signal_raw_fetches')
+            .insert(sectionResult.raw_fetches.map((rf) => ({
+              report_id: report.id,
+              connector_id: connector.id,
+              source: rf.source,
+              request_url: rf.request_url,
+              request_params: rf.request_params,
+              response_body: rf.response_body,
+              response_status: rf.response_status,
+              latency_ms: rf.latency_ms,
+            })))
+
+          if (rawFetchError) {
+            console.error(`[Signal Map] Failed to store raw fetches for ${connector.id}:`, rawFetchError)
+          }
+        }
+
+        // Store section
+        const { error: sectionError } = await supabase
+          .from('signal_sections')
+          .insert({
+            report_id: report.id,
+            section_type: sectionResult.section_type,
+            status: sectionResult.status,
+            data: sectionResult.data,
+            sources: sectionResult.sources,
+            error_message: sectionResult.error_message || null,
+          })
+
+        if (sectionError) {
+          console.error(`[Signal Map] Failed to store section for ${connector.id}:`, sectionError)
+          errorCount++
+        } else {
+          if (sectionResult.status === 'completed') completedCount++
+          else if (sectionResult.status === 'no_data') noDataCount++
+        }
+      } else {
+        // Connector threw an unhandled error
+        await supabase
+          .from('signal_sections')
+          .insert({
+            report_id: report.id,
+            section_type: connector.section_type,
+            status: 'error',
+            data: {},
+            sources: [],
+            error_message: result.reason?.message || 'Unknown error',
+          })
+        errorCount++
+      }
+    }
+
+    // Determine final status
+    let finalStatus: string
+    if (errorCount === connectors.length) {
+      finalStatus = 'failed'
+    } else if (errorCount > 0 || noDataCount > 0) {
+      finalStatus = completedCount > 0 ? 'partial' : 'failed'
+    } else {
+      finalStatus = 'completed'
+    }
+
+    // Update report status
+    await supabase
+      .from('signal_reports')
+      .update({
+        status: finalStatus,
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', report.id)
+
+    console.log(`[Signal Map] Report ${report.id} completed with status: ${finalStatus}`)
+  } catch (error) {
+    console.error('[Signal Map] Fatal error during report generation:', error)
+    
+    // Always update report status to failed on any error
+    await supabase
+      .from('signal_reports')
+      .update({
+        status: 'failed',
+        error_message: error instanceof Error ? error.message : 'Unknown error',
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', report.id)
+
+    return NextResponse.json({ 
+      error: 'Failed to generate report',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
+  }
 
   // Fetch the full report with sections
   const { data: fullReport } = await supabase

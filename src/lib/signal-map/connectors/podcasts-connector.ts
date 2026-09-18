@@ -1,4 +1,5 @@
 import type { SignalConnector, SignalConnectorInput, SignalConnectorResult, Podcast } from '@/types/signal-map'
+import { fetchWithTimeout, truncateForStorage } from '../utils'
 
 const TREG_URL = 'https://treg.to'
 
@@ -28,10 +29,10 @@ export class PodcastsConnector implements SignalConnector {
 
     try {
       console.log(`[PodcastsConnector] Searching Spotify for: ${icp_description}`)
-      const response = await fetch(requestUrl, {
+      const response = await fetchWithTimeout(requestUrl, {
         method: 'GET',
         headers: { 'X-Treg-Token': token },
-      })
+      }, 30000)
 
       const latencyMs = Date.now() - startTime
       const result = await response.json()
