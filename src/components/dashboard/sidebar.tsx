@@ -20,6 +20,7 @@ import {
   Crown,
   Menu,
   X,
+  Compass,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
@@ -32,6 +33,7 @@ const navigation = [
   { name: 'Keywords', href: '/dashboard/keywords', icon: Search },
   { name: 'Matches', href: '/dashboard/matches', icon: TrendingUp },
   { name: 'Leads', href: '/dashboard/leads', icon: Flame },
+  { name: 'Signal Map', href: '/dashboard/signal-map', icon: Compass },
   { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
   { name: 'Activity', href: '/dashboard/activity', icon: Activity },
   { name: 'Competitors', href: '/dashboard/competitors', icon: Target },

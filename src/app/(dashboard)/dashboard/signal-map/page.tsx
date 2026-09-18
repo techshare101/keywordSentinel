@@ -1,0 +1,386 @@
+'use client'
+
+import { useState } from 'react'
+import { Radar, Sparkles, Globe, MessageCircle, Bot, Loader2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { toast } from 'sonner'
+
+interface SignalSection {
+  section_type: string
+  status: string
+  data: any
+  sources: any[]
+}
+
+interface SignalReport {
+  id: string
+  icp_description: string
+  seed_domains: string[]
+  status: string
+  sections: SignalSection[]
+  created_at: string
+}
+
+export default function SignalMapPage() {
+  const [icpDescription, setIcpDescription] = useState('')
+  const [seedDomains, setSeedDomains] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [report, setReport] = useState<SignalReport | null>(null)
+
+  const generateReport = async () => {
+    if (!icpDescription.trim()) {
+      toast.error('Please describe your ICP')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const domains = seedDomains
+        .split('\n')
+        .map(d => d.trim())
+        .filter(Boolean)
+
+      const res = await fetch('/api/signal-map', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          icp_description: icpDescription,
+          seed_domains: domains,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to generate report')
+      }
+
+      setReport(data.report)
+      toast.success('Signal Map generated successfully!')
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to generate report')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-3xl font-bold flex items-center gap-3">
+          <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-cyan-500 to-purple-600 flex items-center justify-center">
+            <Radar className="h-6 w-6 text-white" />
+          </div>
+          ICP Signal Map
+        </h1>
+        <p className="text-slate-400 mt-2">
+          Discover where your ideal customers discuss, ask questions, and what AI says about your category.
+        </p>
+      </div>
+
+      {/* Input Form */}
+      <Card className="p-6 bg-slate-900/50 border-slate-800">
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium text-slate-300 mb-2 block">
+              Describe your Ideal Customer Profile (ICP)
+            </label>
+            <Textarea
+              placeholder="e.g., US med spa owners and aesthetic injectors, or SaaS founders building AI products"
+              value={icpDescription}
+              onChange={(e) => setIcpDescription(e.target.value)}
+              className="min-h-[100px] bg-slate-950 border-slate-800"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-slate-300 mb-2 block">
+              Seed Domains (optional, one per line)
+            </label>
+            <Textarea
+              placeholder="example.com&#10;another.com"
+              value={seedDomains}
+              onChange={(e) => setSeedDomains(e.target.value)}
+              className="min-h-[80px] bg-slate-950 border-slate-800"
+            />
+          </div>
+
+          <Button
+            onClick={generateReport}
+            disabled={loading}
+            className="w-full bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-600 hover:to-purple-700"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Generating Signal Map...
+              </>
+            ) : (
+              <>
+                <Sparkles className="mr-2 h-4 w-4" />
+                Generate ICP Signal Map
+              </>
+            )}
+          </Button>
+        </div>
+      </Card>
+
+      {/* Results */}
+      {report && (
+        <div className="space-y-6">
+          {/* Status Badge */}
+          <div className="flex items-center gap-2">
+            <div className={`h-2 w-2 rounded-full ${
+              report.status === 'completed' ? 'bg-emerald-500' :
+              report.status === 'partial' ? 'bg-amber-500' :
+              'bg-red-500'
+            }`} />
+            <span className="text-sm text-slate-400">
+              Report status: <span className="font-medium text-slate-200 capitalize">{report.status}</span>
+            </span>
+          </div>
+
+          {/* Section: Discussion Venues */}
+          {report.sections.find(s => s.section_type === 'discussion_venues') && (
+            <SectionCard
+              title="Discussion Venues"
+              icon={<MessageCircle className="h-5 w-5" />}
+              section={report.sections.find(s => s.section_type === 'discussion_venues')!}
+            >
+              {section => {
+                const subreddits = section.data.subreddits || []
+                if (subreddits.length === 0) {
+                  return <EmptyState message="No discussion venues found" />
+                }
+                return (
+                  <div className="space-y-4">
+                    {subreddits.map((sub: any, i: number) => (
+                      <div key={i} className="p-4 bg-slate-950/50 rounded-lg border border-slate-800">
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="font-semibold text-cyan-400">
+                            r/{sub.subreddit}
+                          </h3>
+                          <div className="text-sm text-slate-400">
+                            {sub.post_count} posts • avg score {sub.avg_score}
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          {sub.top_posts.slice(0, 3).map((post: any, j: number) => (
+                            <a
+                              key={j}
+                              href={post.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block text-sm text-slate-300 hover:text-cyan-400 transition-colors"
+                            >
+                              → {post.title}
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              }}
+            </SectionCard>
+          )}
+
+          {/* Section: Question Mining */}
+          {report.sections.find(s => s.section_type === 'question_mining') && (
+            <SectionCard
+              title="Questions Your ICP Asks"
+              icon={<Sparkles className="h-5 w-5" />}
+              section={report.sections.find(s => s.section_type === 'question_mining')!}
+            >
+              {section => {
+                const questions = section.data.questions || []
+                if (questions.length === 0) {
+                  return <EmptyState message="No questions found" />
+                }
+                return (
+                  <div className="space-y-3">
+                    {questions.slice(0, 15).map((q: any, i: number) => (
+                      <div key={i} className="p-3 bg-slate-950/50 rounded-lg border border-slate-800">
+                        <p className="text-slate-200 mb-2">{q.question}</p>
+                        <a
+                          href={q.source_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-cyan-400 hover:underline"
+                        >
+                          Source: {q.source}
+                        </a>
+                      </div>
+                    ))}
+                    {questions.length > 15 && (
+                      <p className="text-sm text-slate-500 text-center">
+                        +{questions.length - 15} more questions
+                      </p>
+                    )}
+                  </div>
+                )
+              }}
+            </SectionCard>
+          )}
+
+          {/* Section: AI Answer Share */}
+          {report.sections.find(s => s.section_type === 'ai_answer_share') && (
+            <SectionCard
+              title="AI Answer Share"
+              icon={<Bot className="h-5 w-5" />}
+              section={report.sections.find(s => s.section_type === 'ai_answer_share')!}
+              highlight
+            >
+              {section => {
+                const queries = section.data.queries || []
+                const mentions = section.data.business_mentions || {}
+                
+                if (queries.length === 0) {
+                  return <EmptyState message="No AI responses retrieved" />
+                }
+
+                return (
+                  <div className="space-y-6">
+                    {/* Business Mentions Summary */}
+                    {mentions.top_mentioned && mentions.top_mentioned.length > 0 && (
+                      <div className="p-4 bg-gradient-to-br from-cyan-500/10 to-purple-600/10 rounded-lg border border-cyan-500/20">
+                        <h3 className="font-semibold text-cyan-400 mb-3">
+                          Most Mentioned Businesses
+                        </h3>
+                        <div className="space-y-2">
+                          {mentions.top_mentioned.slice(0, 5).map((m: any, i: number) => (
+                            <div key={i} className="flex items-center justify-between">
+                              <span className="text-slate-200">{m.name}</span>
+                              <span className="text-sm text-slate-400">
+                                {m.count} mentions • {m.engines.join(', ')}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Seed Domain Visibility */}
+                    {mentions.seed_domain_visibility && mentions.seed_domain_visibility.length > 0 && (
+                      <div className="p-4 bg-slate-950/50 rounded-lg border border-slate-800">
+                        <h3 className="font-semibold text-slate-200 mb-3">
+                          Your Domain Visibility
+                        </h3>
+                        <div className="space-y-2">
+                          {mentions.seed_domain_visibility.map((d: any, i: number) => (
+                            <div key={i} className="flex items-center justify-between">
+                              <span className="text-slate-300">{d.domain}</span>
+                              <span className={`text-sm font-medium ${
+                                d.mentioned ? 'text-emerald-400' : 'text-red-400'
+                              }`}>
+                                {d.mentioned ? '✓ Mentioned' : '✗ Not mentioned'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Sample Queries */}
+                    <div>
+                      <h3 className="font-semibold text-slate-200 mb-3">
+                        Sample AI Responses
+                      </h3>
+                      <div className="space-y-3">
+                        {queries.slice(0, 3).map((q: any, i: number) => (
+                          <details key={i} className="p-3 bg-slate-950/50 rounded-lg border border-slate-800">
+                            <summary className="cursor-pointer text-sm font-medium text-slate-300 mb-2">
+                              {q.engine.toUpperCase()}: {q.query}
+                            </summary>
+                            <div className="mt-3 pt-3 border-t border-slate-800">
+                              <p className="text-sm text-slate-400 whitespace-pre-wrap">
+                                {q.response.slice(0, 500)}
+                                {q.response.length > 500 && '...'}
+                              </p>
+                            </div>
+                          </details>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )
+              }}
+            </SectionCard>
+          )}
+
+          {/* Sources Footer */}
+          <div className="text-xs text-slate-500 text-center pt-6 border-t border-slate-800">
+            Generated {new Date(report.created_at).toLocaleString()} • 
+            {report.sections.reduce((sum, s) => sum + (s.sources?.length || 0), 0)} sources consulted
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Reusable section card component
+function SectionCard({ 
+  title, 
+  icon, 
+  section, 
+  children,
+  highlight = false 
+}: {
+  title: string
+  icon: React.ReactNode
+  section: SignalSection
+  children: (section: SignalSection) => React.ReactNode
+  highlight?: boolean
+}) {
+  return (
+    <Card className={`p-6 ${
+      highlight 
+        ? 'bg-gradient-to-br from-cyan-500/5 to-purple-600/5 border-cyan-500/20' 
+        : 'bg-slate-900/50 border-slate-800'
+    }`}>
+      <div className="flex items-center gap-3 mb-4">
+        <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${
+          highlight 
+            ? 'bg-gradient-to-br from-cyan-500 to-purple-600' 
+            : 'bg-slate-800'
+        }`}>
+          {icon}
+        </div>
+        <h2 className="text-xl font-semibold">{title}</h2>
+        <div className="ml-auto">
+          <StatusBadge status={section.status} />
+        </div>
+      </div>
+      {children(section)}
+    </Card>
+  )
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const colors = {
+    completed: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+    no_data: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+    error: 'bg-red-500/10 text-red-400 border-red-500/20',
+    pending: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
+  }
+  
+  return (
+    <span className={`text-xs px-2 py-1 rounded border ${colors[status as keyof typeof colors] || colors.pending}`}>
+      {status}
+    </span>
+  )
+}
+
+function EmptyState({ message }: { message: string }) {
+  return (
+    <div className="text-center py-8 text-slate-500">
+      <Globe className="h-12 w-12 mx-auto mb-3 opacity-50" />
+      <p>{message}</p>
+    </div>
+  )
+}
