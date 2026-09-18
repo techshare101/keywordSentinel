@@ -200,7 +200,9 @@ export class QuestionMiningConnector implements SignalConnector {
 
     return {
       section_type: this.section_type,
-      status: uniqueQuestions.length > 0 && hasEnoughSources ? 'completed' : 'no_data',
+      status: uniqueQuestions.length > 0
+        ? (hasEnoughSources ? 'completed' : 'partial')
+        : 'no_data',
       data: {
         questions: uniqueQuestions.slice(0, 50),
         total_found: uniqueQuestions.length,

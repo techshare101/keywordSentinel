@@ -16,11 +16,16 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { icp_description, seed_domains: rawSeedDomains = [] } = body
+  const { icp_description, seed_domains: rawSeedDomains = [], location } = body
 
   if (!icp_description || icp_description.trim().length < 10) {
     return NextResponse.json({ error: 'ICP description must be at least 10 characters' }, { status: 400 })
   }
+
+  // Append location to ICP description if provided for local buyer-intent queries
+  const enrichedIcp = location 
+    ? `${icp_description.trim()} Location: ${location.trim()}`
+    : icp_description.trim()
 
   // Clean provided seed domains and auto-extract from ICP if none provided
   const cleanedSeedDomains = rawSeedDomains.map((d: string) => 
@@ -29,14 +34,14 @@ export async function POST(req: NextRequest) {
 
   const effectiveSeedDomains = cleanedSeedDomains.length > 0 
     ? cleanedSeedDomains 
-    : extractDomainsFromICP(icp_description)
+    : extractDomainsFromICP(enrichedIcp)
 
   // Create the report
   const { data: report, error: reportError } = await supabase
     .from('signal_reports')
     .insert({
       user_id: user.id,
-      icp_description: icp_description.trim(),
+      icp_description: enrichedIcp,
       seed_domains: effectiveSeedDomains,
       status: 'running',
       started_at: new Date().toISOString(),
@@ -56,7 +61,7 @@ export async function POST(req: NextRequest) {
     // Run all connectors in parallel
     const connectors = getAllConnectors()
     const input = {
-      icp_description: icp_description.trim(),
+      icp_description: enrichedIcp,
       seed_domains: report.seed_domains,
       report_id: report.id,
       user_id: user.id,
@@ -85,6 +90,7 @@ export async function POST(req: NextRequest) {
 
     // Store raw fetches and sections
     let completedCount = 0
+    let partialCount = 0
     let noDataCount = 0
     let errorCount = 0
 
@@ -132,6 +138,7 @@ export async function POST(req: NextRequest) {
           errorCount++
         } else {
           if (sectionResult.status === 'completed') completedCount++
+          else if (sectionResult.status === 'partial') partialCount++
           else if (sectionResult.status === 'no_data') noDataCount++
         }
       } else {
@@ -153,8 +160,8 @@ export async function POST(req: NextRequest) {
     // Determine final status
     if (errorCount === connectors.length) {
       finalStatus = 'failed'
-    } else if (errorCount > 0 || noDataCount > 0) {
-      finalStatus = completedCount > 0 ? 'partial' : 'failed'
+    } else if (errorCount > 0 || partialCount > 0 || noDataCount > 0) {
+      finalStatus = completedCount > 0 || partialCount > 0 ? 'partial' : 'failed'
     } else {
       finalStatus = 'completed'
     }

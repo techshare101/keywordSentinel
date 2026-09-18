@@ -34,6 +34,7 @@ interface SignalReport {
 export default function SignalMapPage() {
   const [icpDescription, setIcpDescription] = useState('')
   const [seedDomains, setSeedDomains] = useState('')
+  const [location, setLocation] = useState('')
   const [loading, setLoading] = useState(false)
   const [report, setReport] = useState<SignalReport | null>(null)
 
@@ -56,6 +57,7 @@ export default function SignalMapPage() {
         body: JSON.stringify({
           icp_description: icpDescription,
           seed_domains: domains,
+          location: location || undefined,
         }),
       })
 
@@ -137,6 +139,18 @@ export default function SignalMapPage() {
               value={seedDomains}
               onChange={(e) => setSeedDomains(e.target.value)}
               className="min-h-[80px] bg-slate-950 border-slate-800"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-slate-300 mb-2 block">
+              Location (optional — enables local buyer-intent queries)
+            </label>
+            <Input
+              placeholder="e.g., Oakdale MN"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              className="bg-slate-950 border-slate-800"
             />
           </div>
 
@@ -612,7 +626,8 @@ function SectionCard({
 function StatusBadge({ status }: { status: string }) {
   const colors = {
     completed: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-    no_data: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+    partial: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+    no_data: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
     error: 'bg-red-500/10 text-red-400 border-red-500/20',
     pending: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
   }

@@ -9,7 +9,7 @@ export type SignalSectionType =
   | 'youtube_channels'
   | 'tech_stack'
   | 'ai_answer_share'
-export type SignalSectionStatus = 'pending' | 'completed' | 'no_data' | 'error'
+export type SignalSectionStatus = 'pending' | 'completed' | 'partial' | 'no_data' | 'error'
 
 export interface SignalReport {
   id: string
