@@ -19,6 +19,7 @@ interface SignalSection {
   status: string
   data: any
   sources: any[]
+  error_message?: string
 }
 
 interface SignalReport {
@@ -599,6 +600,11 @@ function SectionCard({
         </div>
       </div>
       {children(section)}
+      {section.error_message && (
+        <p className="mt-4 text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded px-3 py-2">
+          {section.error_message}
+        </p>
+      )}
     </Card>
   )
 }

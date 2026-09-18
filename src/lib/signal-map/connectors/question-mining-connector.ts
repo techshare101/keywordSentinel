@@ -1,8 +1,41 @@
 import type { SignalConnector, SignalConnectorInput, SignalConnectorResult } from '@/types/signal-map'
-import { extractSearchQuery } from '../utils'
+import { extractSearchQuery, truncateForStorage } from '../utils'
 import Firecrawl from '@mendable/firecrawl-js'
 
 const firecrawl = new Firecrawl({ apiKey: process.env.FIRECRAWL_API_KEY! })
+
+const UI_NOISE_PATTERNS = [
+  /search below/i,
+  /can't find/i,
+  /can't find what/i,
+  /do a search/i,
+  /contact us/i,
+  /sign up/i,
+  /log in/i,
+  /cookie/i,
+  /privacy policy/i,
+  /terms of service/i,
+]
+
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/^#+\s*/gm, '') // headers
+    .replace(/\*\*/g, '') // bold
+    .replace(/\*/g, '') // italic
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // links
+    .replace(/`{1,3}[^`]*`{1,3}/g, '') // inline code
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function isValidQuestion(text: string): boolean {
+  if (!text) return false
+  if (text.length < 25) return false
+  if (text.length > 200) return false
+  if (!text.includes('?') && !/^\s*(what|how|why|when|where|who|which|can|should|does|do|is|are|will)\b/i.test(text)) return false
+  if (UI_NOISE_PATTERNS.some(p => p.test(text))) return false
+  return true
+}
 
 export class QuestionMiningConnector implements SignalConnector {
   id = 'question_mining'
@@ -11,29 +44,24 @@ export class QuestionMiningConnector implements SignalConnector {
 
   async fetch(input: SignalConnectorInput): Promise<SignalConnectorResult> {
     const { icp_description, report_id, seed_domains } = input
-    
-    const questions = []
+
+    const questions: any[] = []
     const rawFetches = []
     const sources = []
 
-    // Use a clean, short query extracted from the ICP description
     const cleanQuery = extractSearchQuery(icp_description, 100)
 
-    // Strategy 1: Search Google for ICP + "how to" / "what is" patterns
+    // Strategy 1: Search Google for ICP + question patterns
     const searchQueries = [
       `${cleanQuery} how to`,
       `${cleanQuery} what is`,
       `${cleanQuery} why`,
-      `${cleanQuery} best practices`,
     ]
 
-    for (const query of searchQueries.slice(0, 3)) {
+    for (const query of searchQueries) {
       const startTime = Date.now()
       try {
-        const searchResult = await firecrawl.search(query, {
-          limit: 10,
-        })
-
+        const searchResult = await firecrawl.search(query, { limit: 10 })
         const latencyMs = Date.now() - startTime
 
         rawFetches.push({
@@ -42,21 +70,20 @@ export class QuestionMiningConnector implements SignalConnector {
           source: 'google_paa',
           request_url: `https://api.firecrawl.dev/v1/search`,
           request_params: { query, limit: 10 },
-          response_body: searchResult,
+          response_body: truncateForStorage(searchResult),
           response_status: 200,
           latency_ms: latencyMs,
         })
 
         if (searchResult && Array.isArray(searchResult)) {
           for (const result of searchResult.slice(0, 5)) {
-            // Extract question-like patterns from titles
-            const title = result.title || ''
-            if (title.includes('?') || title.toLowerCase().includes('how') || title.toLowerCase().includes('what')) {
+            const title = stripMarkdown(result.title || '')
+            if (isValidQuestion(title)) {
               questions.push({
                 question: title,
                 source_url: result.url,
-                source: 'paa',
-                snippet: result.description,
+                source: new URL(result.url).hostname,
+                snippet: stripMarkdown(result.description || '').slice(0, 250),
               })
             }
           }
@@ -69,7 +96,7 @@ export class QuestionMiningConnector implements SignalConnector {
           })
         }
 
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        await new Promise(resolve => setTimeout(resolve, 300))
       } catch (error) {
         rawFetches.push({
           report_id,
@@ -77,7 +104,7 @@ export class QuestionMiningConnector implements SignalConnector {
           source: 'google_paa',
           request_url: `https://api.firecrawl.dev/v1/search`,
           request_params: { query },
-          response_body: { error: String(error) },
+          response_body: truncateForStorage({ error: String(error) }),
           response_status: 500,
           latency_ms: Date.now() - startTime,
         })
@@ -108,20 +135,20 @@ export class QuestionMiningConnector implements SignalConnector {
             source: 'domain_faq',
             request_url: url,
             request_params: { domain },
-            response_body: scrapeResult,
+            response_body: truncateForStorage(scrapeResult),
             response_status: scrapeResult ? 200 : 404,
             latency_ms: latencyMs,
           })
 
           if (scrapeResult && scrapeResult.markdown) {
-            // Extract question patterns from markdown
             const lines = scrapeResult.markdown.split('\n')
             for (const line of lines) {
-              if (line.includes('?') && line.length > 10 && line.length < 200) {
+              const cleaned = stripMarkdown(line)
+              if (isValidQuestion(cleaned)) {
                 questions.push({
-                  question: line.trim(),
+                  question: cleaned,
                   source_url: url,
-                  source: 'domain_faq',
+                  source: domain,
                   snippet: null,
                 })
               }
@@ -135,19 +162,55 @@ export class QuestionMiningConnector implements SignalConnector {
             })
           }
 
-          await new Promise(resolve => setTimeout(resolve, 500))
+          await new Promise(resolve => setTimeout(resolve, 300))
         } catch (error) {
-          // Silently continue
+          rawFetches.push({
+            report_id,
+            connector_id: this.id,
+            source: 'domain_faq',
+            request_url: url,
+            request_params: { domain },
+            response_body: truncateForStorage({ error: String(error) }),
+            response_status: 500,
+            latency_ms: Date.now() - startTime,
+          })
         }
       }
     }
 
+    // Deduplicate and count distinct source domains
+    const seen = new Set<string>()
+    const uniqueQuestions = questions.filter(q => {
+      const key = q.question.toLowerCase()
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+
+    const distinctSources = new Set(uniqueQuestions.map(q => {
+      try {
+        return new URL(q.source_url).hostname
+      } catch {
+        return q.source
+      }
+    }))
+
+    // Require at least 3 distinct source domains for a trustworthy signal
+    const hasEnoughSources = distinctSources.size >= 3
+
     return {
       section_type: this.section_type,
-      status: questions.length > 0 ? 'completed' : 'no_data',
-      data: { questions: questions.slice(0, 50) },
+      status: uniqueQuestions.length > 0 && hasEnoughSources ? 'completed' : 'no_data',
+      data: {
+        questions: uniqueQuestions.slice(0, 50),
+        total_found: uniqueQuestions.length,
+        distinct_sources: Array.from(distinctSources).slice(0, 20),
+      },
       sources,
       raw_fetches: rawFetches,
+      error_message: uniqueQuestions.length > 0 && !hasEnoughSources
+        ? `Found ${uniqueQuestions.length} questions but only ${distinctSources.size} source domain(s). Need 3+ distinct sources.`
+        : undefined,
     }
   }
 }

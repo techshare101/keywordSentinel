@@ -147,6 +147,9 @@ export class RedditConnector implements SignalConnector {
       data: { venues: venues.slice(0, 15) },
       sources,
       raw_fetches,
+      error_message: venues.length === 0 && raw_fetches.some(f => f.response_status === 403)
+        ? 'Reddit blocks unauthenticated requests from cloud servers. OAuth integration required.'
+        : venues.length === 0 ? 'No discussion venues found for this query.' : undefined,
     }
   }
 

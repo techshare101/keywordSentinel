@@ -112,7 +112,10 @@ export class IndustryHubsConnector implements SignalConnector {
     }
 
     // Sort by mention count and build hub list
+    // Require a hub to be linked from 3+ distinct seed domains to avoid vendor/sponsor noise
+    const MIN_SEED_DOMAINS = 3
     const sortedDomains = Array.from(domainMentions.entries())
+      .filter(([_, data]) => data.sourceUrls.length >= MIN_SEED_DOMAINS)
       .sort((a, b) => b[1].count - a[1].count)
       .slice(0, 20)
 
@@ -120,19 +123,30 @@ export class IndustryHubsConnector implements SignalConnector {
       hubs.push({
         domain,
         title: data.title || domain,
-        description: data.description || `Linked ${data.count} time(s) from seed domains`,
+        description: data.description || `Linked ${data.count} time(s) from ${data.sourceUrls.length} seed domain(s)`,
         mention_count: data.count,
         source_urls: data.sourceUrls,
         category: this.categorizeDomain(domain),
       })
     }
 
+    const belowThreshold = Array.from(domainMentions.entries())
+      .filter(([_, data]) => data.sourceUrls.length < MIN_SEED_DOMAINS)
+      .length
+
     return {
       section_type: this.section_type,
       status: hubs.length > 0 ? 'completed' : 'no_data',
-      data: { hubs, total_domains_found: domainMentions.size },
+      data: { 
+        hubs, 
+        total_domains_found: domainMentions.size,
+        domains_below_threshold: belowThreshold,
+      },
       sources,
       raw_fetches: rawFetches,
+      error_message: hubs.length === 0 && domainMentions.size > 0
+        ? `Found ${domainMentions.size} linked domains but none linked from ${MIN_SEED_DOMAINS}+ seed domains. Add more seed domains.`
+        : undefined,
     }
   }
 

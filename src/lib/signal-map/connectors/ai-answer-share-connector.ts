@@ -1,5 +1,5 @@
 import type { SignalConnector, SignalConnectorInput, SignalConnectorResult } from '@/types/signal-map'
-import { extractSearchQuery } from '../utils'
+import { extractSearchQuery, fetchWithTimeout, truncateForStorage } from '../utils'
 import OpenAI from 'openai'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
@@ -39,10 +39,11 @@ export class AIAnswerShareConnector implements SignalConnector {
 
   async fetch(input: SignalConnectorInput): Promise<SignalConnectorResult> {
     const { icp_description, report_id, seed_domains } = input
-    
+
     const answers = []
     const rawFetches = []
     const sources = []
+    const errors = []
 
     const queries = this.generateQueries(icp_description, seed_domains)
 
@@ -54,23 +55,26 @@ export class AIAnswerShareConnector implements SignalConnector {
         this.queryGemini(query, report_id),
       ])
 
-      if (openaiResult) {
+      if (openaiResult?.answer) {
         answers.push(openaiResult.answer)
-        rawFetches.push(openaiResult.rawFetch)
-        sources.push(openaiResult.source)
       }
+      if (openaiResult?.rawFetch) rawFetches.push(openaiResult.rawFetch)
+      if (openaiResult?.source) sources.push(openaiResult.source)
+      if (openaiResult?.error) errors.push(openaiResult.error)
 
-      if (perplexityResult) {
+      if (perplexityResult?.answer) {
         answers.push(perplexityResult.answer)
-        rawFetches.push(perplexityResult.rawFetch)
-        sources.push(perplexityResult.source)
       }
+      if (perplexityResult?.rawFetch) rawFetches.push(perplexityResult.rawFetch)
+      if (perplexityResult?.source) sources.push(perplexityResult.source)
+      if (perplexityResult?.error) errors.push(perplexityResult.error)
 
-      if (geminiResult) {
+      if (geminiResult?.answer) {
         answers.push(geminiResult.answer)
-        rawFetches.push(geminiResult.rawFetch)
-        sources.push(geminiResult.source)
       }
+      if (geminiResult?.rawFetch) rawFetches.push(geminiResult.rawFetch)
+      if (geminiResult?.source) sources.push(geminiResult.source)
+      if (geminiResult?.error) errors.push(geminiResult.error)
     }
 
     const businessMentions = this.extractBusinessMentions(answers, seed_domains)
@@ -86,6 +90,7 @@ export class AIAnswerShareConnector implements SignalConnector {
       },
       sources,
       raw_fetches: rawFetches,
+      error_message: errors.length > 0 ? errors.join('; ').slice(0, 500) : undefined,
     }
   }
 
@@ -98,7 +103,7 @@ export class AIAnswerShareConnector implements SignalConnector {
     queries.push(`What ${cleanQuery} should I use?`)
     queries.push(`Best ${cleanQuery} for small business`)
     queries.push(`Most recommended ${cleanQuery}`)
-    
+
     if (domains.length > 0) {
       queries.push(`What do you think about ${domains[0]}?`)
       if (domains.length > 1) {
@@ -125,6 +130,7 @@ export class AIAnswerShareConnector implements SignalConnector {
           { role: 'user', content: query },
         ],
         temperature: 0.7,
+        max_tokens: 400,
       })
 
       const latencyMs = Date.now() - startTime
@@ -144,7 +150,7 @@ export class AIAnswerShareConnector implements SignalConnector {
           source: 'openai',
           request_url: 'https://api.openai.com/v1/chat/completions',
           request_params: { model: 'gpt-4o-mini', query },
-          response_body: response,
+          response_body: truncateForStorage({ text: answer.slice(0, 2000) }),
           response_status: 200,
           latency_ms: latencyMs,
         },
@@ -155,8 +161,21 @@ export class AIAnswerShareConnector implements SignalConnector {
           fetched_at: new Date().toISOString(),
         },
       }
-    } catch (error) {
-      return null
+    } catch (error: any) {
+      console.error(`[AIAnswerShare] OpenAI error for "${query}":`, error.message || error)
+      return {
+        rawFetch: {
+          report_id: reportId,
+          connector_id: this.id,
+          source: 'openai',
+          request_url: 'https://api.openai.com/v1/chat/completions',
+          request_params: { model: 'gpt-4o-mini', query },
+          response_body: truncateForStorage({ error: error.message || String(error) }),
+          response_status: error.status || 500,
+          latency_ms: Date.now() - startTime,
+        },
+        error: `OpenAI: ${error.message || 'Unknown error'}`,
+      }
     }
   }
 
@@ -167,7 +186,7 @@ export class AIAnswerShareConnector implements SignalConnector {
     const startTime = Date.now()
     try {
       const response = await client.chat.completions.create({
-        model: 'llama-3.1-sonar-small-128k-online',
+        model: 'sonar',
         messages: [
           {
             role: 'system',
@@ -176,6 +195,7 @@ export class AIAnswerShareConnector implements SignalConnector {
           { role: 'user', content: query },
         ],
         temperature: 0.7,
+        max_tokens: 400,
       })
 
       const latencyMs = Date.now() - startTime
@@ -194,8 +214,8 @@ export class AIAnswerShareConnector implements SignalConnector {
           connector_id: this.id,
           source: 'perplexity',
           request_url: 'https://api.perplexity.ai/chat/completions',
-          request_params: { model: 'llama-3.1-sonar-small-128k-online', query },
-          response_body: response,
+          request_params: { model: 'sonar', query },
+          response_body: truncateForStorage({ text: answer.slice(0, 2000) }),
           response_status: 200,
           latency_ms: latencyMs,
         },
@@ -206,8 +226,21 @@ export class AIAnswerShareConnector implements SignalConnector {
           fetched_at: new Date().toISOString(),
         },
       }
-    } catch (error) {
-      return null
+    } catch (error: any) {
+      console.error(`[AIAnswerShare] Perplexity error for "${query}":`, error.message || error)
+      return {
+        rawFetch: {
+          report_id: reportId,
+          connector_id: this.id,
+          source: 'perplexity',
+          request_url: 'https://api.perplexity.ai/chat/completions',
+          request_params: { model: 'sonar', query },
+          response_body: truncateForStorage({ error: error.message || String(error) }),
+          response_status: error.status || 500,
+          latency_ms: Date.now() - startTime,
+        },
+        error: `Perplexity: ${error.message || 'Unknown error'}`,
+      }
     }
   }
 
@@ -217,7 +250,7 @@ export class AIAnswerShareConnector implements SignalConnector {
 
     const startTime = Date.now()
     try {
-      const model = client.getGenerativeModel({ model: 'gemini-1.5-flash' })
+      const model = client.getGenerativeModel({ model: 'gemini-3.6-flash' })
       const result = await model.generateContent(query)
       const answer = result.response.text()
 
@@ -235,28 +268,41 @@ export class AIAnswerShareConnector implements SignalConnector {
           report_id: reportId,
           connector_id: this.id,
           source: 'gemini',
-          request_url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash',
-          request_params: { model: 'gemini-1.5-flash', query },
-          response_body: { text: answer },
+          request_url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash',
+          request_params: { model: 'gemini-3.6-flash', query },
+          response_body: truncateForStorage({ text: answer.slice(0, 2000) }),
           response_status: 200,
           latency_ms: latencyMs,
         },
         source: {
           source: 'gemini',
           url: 'https://gemini.google.com',
-          description: `Gemini 1.5 Flash response to "${query}"`,
+          description: `Gemini 3.6 Flash response to "${query}"`,
           fetched_at: new Date().toISOString(),
         },
       }
-    } catch (error) {
-      return null
+    } catch (error: any) {
+      console.error(`[AIAnswerShare] Gemini error for "${query}":`, error.message || error)
+      return {
+        rawFetch: {
+          report_id: reportId,
+          connector_id: this.id,
+          source: 'gemini',
+          request_url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash',
+          request_params: { model: 'gemini-3.6-flash', query },
+          response_body: truncateForStorage({ error: error.message || String(error) }),
+          response_status: error.status || 500,
+          latency_ms: Date.now() - startTime,
+        },
+        error: `Gemini: ${error.message || 'Unknown error'}`,
+      }
     }
   }
 
   private extractNamesFromText(text: string): string[] {
     const words = text.split(/\s+/)
     const names = new Set<string>()
-    
+
     for (let i = 0; i < words.length; i++) {
       const word = words[i]
       if (word && /^[A-Z][a-z]+/.test(word) && word.length > 2) {
@@ -287,7 +333,7 @@ export class AIAnswerShareConnector implements SignalConnector {
     }
 
     const seedDomainMentions = seedDomains.map(domain => {
-      const mentioned = Array.from(mentionCount.keys()).some(name => 
+      const mentioned = Array.from(mentionCount.keys()).some(name =>
         name.toLowerCase().includes(domain.split('.')[0].toLowerCase())
       )
       return { domain, mentioned }
