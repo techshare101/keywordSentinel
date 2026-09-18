@@ -205,22 +205,27 @@ function classifyClaim(
   const qLower = question.toLowerCase()
   const aiLower = aiAnswer.toLowerCase()
 
-  // Foreign citations override everything — this is its own finding
+  // Foreign citations: only flag FOREIGN_SOURCE if the answer has NO official (clinic-domain) citation
+  const officialCitations = citations.filter(c => {
+    const domain = getDomain(c)
+    return domain === clinicDomain || domain.includes(clinicDomain)
+  })
   const foreignCitations = citations.filter(c => {
     const domain = getDomain(c)
     return domain && domain !== clinicDomain && !domain.includes(clinicDomain)
   })
+  const hasOfficialCitation = officialCitations.length > 0
   const hasForeignCitation = foreignCitations.length > 0 && citations.length > 0
+  const foreignSourceOnly = hasForeignCitation && !hasOfficialCitation
 
   // Hedged or absent = can't confirm
   if (isHedged(aiAnswer)) {
-    return hasForeignCitation ? 'foreign_source' : 'cant_confirm'
+    return foreignSourceOnly ? 'foreign_source' : 'cant_confirm'
   }
 
   // If AI asserts something not found on site
   if (!siteFact) {
-    if (hasForeignCitation) return 'foreign_source'
-    return 'unsupported'
+    return foreignSourceOnly ? 'foreign_source' : 'unsupported'
   }
 
   const siteLower = siteFact.toLowerCase()
@@ -235,10 +240,10 @@ function classifyClaim(
       const siteSet = new Set(siteHours.map(h => h.replace(/\s+/g, '')))
       const hasMismatch = Array.from(aiSet).some(h => !siteSet.has(h))
       if (hasMismatch) {
-        return hasForeignCitation ? 'foreign_source' : 'contradiction'
+        return foreignSourceOnly ? 'foreign_source' : 'contradiction'
       }
     }
-    return hasForeignCitation ? 'foreign_source' : 'cant_confirm'
+    return foreignSourceOnly ? 'foreign_source' : 'cant_confirm'
   }
 
   // Phone/address: only direct contradictions
@@ -249,10 +254,10 @@ function classifyClaim(
     if (aiPhones.length > 0 && sitePhones.length > 0) {
       const hasMatch = aiPhones.some(p => sitePhones.includes(p))
       if (!hasMatch) {
-        return hasForeignCitation ? 'foreign_source' : 'contradiction'
+        return foreignSourceOnly ? 'foreign_source' : 'contradiction'
       }
     }
-    return hasForeignCitation ? 'foreign_source' : 'cant_confirm'
+    return foreignSourceOnly ? 'foreign_source' : 'cant_confirm'
   }
 
   // Services: unsupported if AI claims a service the site doesn't list
@@ -262,13 +267,13 @@ function classifyClaim(
       const siteMentions = siteLower.includes(targetService.toLowerCase())
       
       if (aiMentions && !siteMentions) {
-        return hasForeignCitation ? 'foreign_source' : 'unsupported'
+        return foreignSourceOnly ? 'foreign_source' : 'unsupported'
       }
     }
-    return hasForeignCitation ? 'foreign_source' : 'cant_confirm'
+    return foreignSourceOnly ? 'foreign_source' : 'cant_confirm'
   }
 
-  if (hasForeignCitation) return 'foreign_source'
+  if (foreignSourceOnly) return 'foreign_source'
   return 'unsupported'
 }
 
