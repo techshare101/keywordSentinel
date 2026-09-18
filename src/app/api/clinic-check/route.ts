@@ -199,12 +199,13 @@ function classifyClaim(
   siteFact: string | null,
   question: string,
   citations: string[],
-  clinicDomain: string
+  clinicDomain: string,
+  targetService: string | null
 ): 'contradiction' | 'unsupported' | 'cant_confirm' | 'foreign_source' {
   const qLower = question.toLowerCase()
   const aiLower = aiAnswer.toLowerCase()
 
-  // Check for foreign citations
+  // Foreign citations override everything — this is its own finding
   const foreignCitations = citations.filter(c => {
     const domain = getDomain(c)
     return domain && domain !== clinicDomain && !domain.includes(clinicDomain)
@@ -213,7 +214,7 @@ function classifyClaim(
 
   // Hedged or absent = can't confirm
   if (isHedged(aiAnswer)) {
-    return 'cant_confirm'
+    return hasForeignCitation ? 'foreign_source' : 'cant_confirm'
   }
 
   // If AI asserts something not found on site
@@ -224,7 +225,7 @@ function classifyClaim(
 
   const siteLower = siteFact.toLowerCase()
 
-  // Hours contradiction
+  // Hours: only direct contradictions
   if (qLower.includes('hour')) {
     const aiHours = aiLower.match(/\d{1,2}[:.]\d{2}\s*[ap]m?/g) || []
     const siteHours = siteLower.match(/\d{1,2}[:.]\d{2}\s*[ap]m?/g) || []
@@ -236,12 +237,12 @@ function classifyClaim(
       if (hasMismatch) {
         return hasForeignCitation ? 'foreign_source' : 'contradiction'
       }
-      return 'unsupported' // AI and site agree, but not a contradiction
     }
+    return hasForeignCitation ? 'foreign_source' : 'cant_confirm'
   }
 
-  // Phone contradiction
-  if (qLower.includes('phone') || qLower.includes('book')) {
+  // Phone/address: only direct contradictions
+  if (qLower.includes('phone') || qLower.includes('address') || qLower.includes('book')) {
     const aiPhones = (aiAnswer.match(/\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g) || []).map(p => p.replace(/\D/g, ''))
     const sitePhones = (siteFact.match(/\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g) || []).map(p => p.replace(/\D/g, ''))
     
@@ -251,12 +252,20 @@ function classifyClaim(
         return hasForeignCitation ? 'foreign_source' : 'contradiction'
       }
     }
+    return hasForeignCitation ? 'foreign_source' : 'cant_confirm'
   }
 
-  // Services unsupported
-  if (qLower.includes('service') || qLower.includes('treatment')) {
-    if (hasForeignCitation) return 'foreign_source'
-    return 'unsupported'
+  // Services: unsupported if AI claims a service the site doesn't list
+  if (qLower.includes('service') || qLower.includes('treatment') || (targetService && qLower.includes(targetService))) {
+    if (targetService) {
+      const aiMentions = aiLower.includes(targetService.toLowerCase())
+      const siteMentions = siteLower.includes(targetService.toLowerCase())
+      
+      if (aiMentions && !siteMentions) {
+        return hasForeignCitation ? 'foreign_source' : 'unsupported'
+      }
+    }
+    return hasForeignCitation ? 'foreign_source' : 'cant_confirm'
   }
 
   if (hasForeignCitation) return 'foreign_source'
@@ -370,7 +379,7 @@ export async function POST(req: NextRequest) {
 
       const primary = aiResponses[0]
       const siteFact = siteContent ? extractSiteFact(siteContent, question) : null
-      const status = classifyClaim(primary.text, siteFact, question, primary.citations, clinicDomain)
+      const status = classifyClaim(primary.text, siteFact, question, primary.citations, clinicDomain, targetService)
 
       const foreignCitations = primary.citations.filter(c => {
         const domain = getDomain(c)
