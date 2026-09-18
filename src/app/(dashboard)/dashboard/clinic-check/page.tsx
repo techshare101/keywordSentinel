@@ -1,24 +1,44 @@
 'use client'
 
 import { useState } from 'react'
-import { Stethoscope, Search, Loader2, AlertTriangle, HelpCircle, Globe, Download, CheckCircle2, FileX, ShieldAlert, RefreshCw } from 'lucide-react'
+import {
+  Stethoscope, Search, Loader2, AlertTriangle, HelpCircle, Globe, Download,
+  CheckCircle2, FileX, ShieldAlert, CircleSlash, MinusCircle, Info,
+} from 'lucide-react'
 import jsPDF from 'jspdf'
+
+type ClaimStatus =
+  | 'contradiction' | 'foreign_source' | 'source_conflict' | 'unsupported'
+  | 'not_named' | 'partial' | 'cant_confirm' | 'confirmed'
 
 interface EngineStatus {
   engine: string
-  status: 'ok' | 'failed' | 'quota'
+  status: 'ok' | 'partial' | 'failed' | 'quota'
+  answered: number
+  of: number
+  error: string | null
+}
+
+interface EngineClaim {
+  engine: string
+  answer: string
+  citations: string[]
+  status: ClaimStatus
+  reason: string
 }
 
 interface Claim {
   question: string
+  status: ClaimStatus
+  reason: string
+  engines: EngineClaim[]
+  agreement?: boolean
   ai_answer: string
   site_fact: string | null
-  status: 'confirmed' | 'contradiction' | 'unsupported' | 'cant_confirm' | 'source_conflict' | 'foreign_source'
   ai_citations: string[]
   foreign_citations: string[]
   directory_citations: string[]
   official_citations: string[]
-  raw_response: string
 }
 
 interface Report {
@@ -28,26 +48,51 @@ interface Report {
   website: string | null
   target_service: string | null
   category_service: string | null
+  scraped_pages: string[]
+  scrape_error: string | null
   claims: Claim[]
   engine_status: EngineStatus[]
+  working_engines: number
+  report_grade: 'reportable' | 'probe_only'
+  sellable_findings: number
   completed_at: string
-  summary: {
-    confirmed: number
-    contradiction: number
-    unsupported: number
-    cant_confirm: number
-    source_conflict: number
-    foreign_source: number
-  }
+  summary: Record<ClaimStatus, number>
 }
 
-const STATUS_CONFIG: Record<Claim['status'], { label: string; color: string; icon: any }> = {
-  confirmed: { label: 'CONFIRMED', color: '#34d399', icon: CheckCircle2 },
+const STATUS_CONFIG: Record<ClaimStatus, { label: string; color: string; icon: any }> = {
   contradiction: { label: 'CONTRADICTION', color: '#f87171', icon: AlertTriangle },
-  unsupported: { label: 'UNSUPPORTED', color: '#fbbf24', icon: FileX },
-  cant_confirm: { label: "CAN'T CONFIRM", color: '#94a3b8', icon: HelpCircle },
-  source_conflict: { label: 'SOURCE CONFLICT', color: '#a78bfa', icon: ShieldAlert },
   foreign_source: { label: 'FOREIGN SOURCE', color: '#f472b6', icon: Globe },
+  source_conflict: { label: 'SOURCE CONFLICT', color: '#a78bfa', icon: ShieldAlert },
+  unsupported: { label: 'UNSUPPORTED', color: '#fbbf24', icon: FileX },
+  not_named: { label: 'NOT NAMED', color: '#fb923c', icon: CircleSlash },
+  partial: { label: 'PARTIAL', color: '#38bdf8', icon: MinusCircle },
+  cant_confirm: { label: "CAN'T CONFIRM", color: '#94a3b8', icon: HelpCircle },
+  confirmed: { label: 'CONFIRMED', color: '#34d399', icon: CheckCircle2 },
+}
+
+// Findings worth putting in front of a clinic owner, worst first.
+const FINDING_TILES: ClaimStatus[] = [
+  'contradiction', 'foreign_source', 'source_conflict', 'unsupported',
+]
+const CONTEXT_TILES: ClaimStatus[] = ['not_named', 'partial', 'confirmed', 'cant_confirm']
+
+const TILE_LABELS: Record<ClaimStatus, string> = {
+  contradiction: 'Contradictions',
+  foreign_source: 'Foreign Sources',
+  source_conflict: 'Source Conflicts',
+  unsupported: 'Unsupported',
+  not_named: 'Not Named',
+  partial: 'Partial',
+  confirmed: 'Confirmed',
+  cant_confirm: "Can't Confirm",
+}
+
+function getDomain(url: string): string {
+  try {
+    return new URL(url.startsWith('http') ? url : `https://${url}`).hostname.replace(/^www\./, '')
+  } catch {
+    return url
+  }
 }
 
 export default function ClinicCheckPage() {
@@ -75,8 +120,7 @@ export default function ClinicCheckPage() {
         const err = await res.json()
         throw new Error(err.error || 'Failed to run clinic check')
       }
-      const data = await res.json()
-      setReport(data)
+      setReport(await res.json())
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -87,99 +131,98 @@ export default function ClinicCheckPage() {
   const downloadPDF = () => {
     if (!report) return
     const doc = new jsPDF({ unit: 'pt', format: 'letter' })
-    const m = 36
+    const W = doc.internal.pageSize.getWidth()
+    const m = 40
     let y = m
 
-    doc.setFillColor(10, 10, 15)
-    doc.rect(0, 0, doc.internal.pageSize.getWidth(), doc.internal.pageSize.getHeight(), 'F')
+    const paintPage = () => {
+      doc.setFillColor(10, 10, 15)
+      doc.rect(0, 0, W, doc.internal.pageSize.getHeight(), 'F')
+    }
+    paintPage()
 
     doc.setTextColor(244, 114, 182)
-    doc.setFontSize(24)
+    doc.setFontSize(22)
     doc.setFont('helvetica', 'bold')
     doc.text('Clinic AI Check', m, y)
-    y += 32
+    y += 28
 
     doc.setTextColor(226, 232, 240)
     doc.setFontSize(14)
     doc.text(report.clinic_name, m, y)
-    y += 18
+    y += 16
     doc.setFontSize(10)
     doc.setTextColor(148, 163, 184)
-    doc.text(`${report.location} — ${report.website || 'no website'}`, m, y)
-    y += 24
+    doc.text(`${report.location} \u2014 ${report.website || 'no website'}`, m, y)
+    y += 20
 
-    doc.setTextColor(100, 116, 139)
     doc.setFontSize(9)
-    doc.text(`Engines: ${report.engine_status.map(e => `${e.engine} ${e.status === 'ok' ? '✓' : '✗'}`).join(' | ')}`, m, y)
-    y += 14
-    doc.text(`Generated: ${new Date(report.completed_at).toLocaleString()}`, m, y)
-    y += 28
+    doc.setTextColor(100, 116, 139)
+    doc.text(
+      `Engines: ${report.engine_status.map((e) => `${e.engine} ${e.answered}/${e.of}`).join('  |  ')}`,
+      m, y
+    )
+    y += 13
+    doc.text(`Checked: ${new Date(report.completed_at).toLocaleString()}`, m, y)
+    y += 22
 
-    if (report.target_service) {
-      doc.setTextColor(244, 114, 182)
-      doc.setFontSize(10)
-      doc.text(`Target service from site: ${report.target_service}`, m, y)
-      y += 18
-    }
-    if (report.category_service) {
+    if (report.report_grade === 'probe_only') {
       doc.setTextColor(251, 191, 36)
-      doc.setFontSize(10)
-      doc.text(`Category-standard check: ${report.category_service}`, m, y)
-      y += 18
+      doc.setFontSize(9)
+      doc.text(
+        'PROBE ONLY \u2014 fewer than two engines answered. Not a finished report.',
+        m, y
+      )
+      y += 20
     }
-    y += 10
 
-    const sellableFindings = report.summary.contradiction + report.summary.unsupported + report.summary.source_conflict + report.summary.foreign_source
     doc.setTextColor(255, 255, 255)
     doc.setFontSize(11)
-    doc.text(`Sellable findings: ${sellableFindings} — Confirmed: ${report.summary.confirmed} — Can't confirm: ${report.summary.cant_confirm}`, m, y)
-    y += 24
+    doc.text(
+      `Findings: ${report.sellable_findings}   \u00b7   Confirmed: ${report.summary.confirmed}   \u00b7   Can't confirm: ${report.summary.cant_confirm}`,
+      m, y
+    )
+    y += 22
 
     for (const claim of report.claims) {
-      if (y > 680) {
-        doc.addPage()
-        doc.setFillColor(10, 10, 15)
-        doc.rect(0, 0, doc.internal.pageSize.getWidth(), doc.internal.pageSize.getHeight(), 'F')
-        y = m
-      }
+      if (y > 660) { doc.addPage(); paintPage(); y = m }
 
       const cfg = STATUS_CONFIG[claim.status]
-      const Icon = cfg.icon
-
-      doc.setDrawColor(30, 41, 59)
-      doc.setLineWidth(1)
-      doc.roundedRect(m, y, doc.internal.pageSize.getWidth() - m * 2, 110, 6, 6, 'S')
-
       const r = parseInt(cfg.color.slice(1, 3), 16)
       const g = parseInt(cfg.color.slice(3, 5), 16)
       const b = parseInt(cfg.color.slice(5, 7), 16)
+
+      doc.setDrawColor(30, 41, 59)
+      doc.roundedRect(m, y, W - m * 2, 118, 6, 6, 'S')
+
       doc.setTextColor(r, g, b)
       doc.setFont('helvetica', 'bold')
       doc.setFontSize(9)
-      doc.text(cfg.label, m + 8, y + 16)
+      doc.text(cfg.label, m + 10, y + 16)
 
       doc.setTextColor(226, 232, 240)
       doc.setFont('helvetica', 'normal')
       doc.setFontSize(10)
-      const questionLines = doc.splitTextToSize(claim.question, doc.internal.pageSize.getWidth() - m * 2 - 16)
-      doc.text(questionLines, m + 8, y + 34)
+      doc.text(doc.splitTextToSize(claim.question, W - m * 2 - 20), m + 10, y + 34)
+
+      doc.setTextColor(203, 213, 225)
+      doc.setFontSize(8)
+      doc.text(doc.splitTextToSize(`Why: ${claim.reason}`, W - m * 2 - 20), m + 10, y + 52)
 
       doc.setTextColor(148, 163, 184)
-      doc.setFontSize(8)
-      const aiLines = doc.splitTextToSize(`AI: ${claim.ai_answer}`, doc.internal.pageSize.getWidth() - m * 2 - 16)
-      doc.text(aiLines, m + 8, y + 54)
+      doc.text(
+        doc.splitTextToSize(`AI: ${claim.ai_answer.slice(0, 400)}`, W - m * 2 - 20),
+        m + 10, y + 72
+      )
 
-      const siteText = claim.site_fact ? `Site: ${claim.site_fact}` : 'Site: no extractable fact'
-      const siteLines = doc.splitTextToSize(siteText, doc.internal.pageSize.getWidth() - m * 2 - 16)
-      doc.text(siteLines, m + 8, y + 74)
-
-      if (claim.directory_citations.length > 0) {
-        const dirDomains = claim.directory_citations.map(c => new URL(c.startsWith('http') ? c : `https://${c}`).hostname.replace(/^www\./, ''))
+      if (claim.directory_citations.length || claim.foreign_citations.length) {
         doc.setTextColor(167, 139, 250)
-        doc.text(`Directory sources: ${dirDomains.join(', ')}`, m + 8, y + 96)
+        const cites = [...claim.directory_citations, ...claim.foreign_citations]
+          .map(getDomain).slice(0, 6).join(', ')
+        doc.text(`Sources: ${cites}`, m + 10, y + 108)
       }
 
-      y += 124
+      y += 132
     }
 
     doc.save(`clinic-check-${report.clinic_name.toLowerCase().replace(/\s+/g, '-')}.pdf`)
@@ -189,111 +232,131 @@ export default function ClinicCheckPage() {
     <div className="min-h-screen bg-[#0a0a0f] p-6">
       <div className="max-w-5xl mx-auto">
         <div className="flex items-center gap-4 mb-8">
-          <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center">
+          <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-cyan-400 via-purple-500 to-pink-500 flex items-center justify-center">
             <Stethoscope className="h-6 w-6 text-white" />
           </div>
           <div>
             <h1 className="text-3xl font-bold text-white">Clinic AI Check</h1>
-            <p className="text-slate-400">One clinic. Five questions. What AI gets wrong.</p>
+            <p className="text-slate-400">One clinic. Six questions. What AI can and cannot verify.</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <input
-            type="text"
-            placeholder="Clinic name"
-            value={clinicName}
-            onChange={(e) => setClinicName(e.target.value)}
-            className="bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
-          />
-          <input
-            type="text"
-            placeholder="Location (e.g., Oakdale MN)"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            className="bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
-          />
-          <input
-            type="text"
-            placeholder="Website (optional)"
-            value={website}
-            onChange={(e) => setWebsite(e.target.value)}
-            className="bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
-          />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          {[
+            { v: clinicName, set: setClinicName, ph: 'Clinic name' },
+            { v: location, set: setLocation, ph: 'Location (e.g. Oakdale MN)' },
+            { v: website, set: setWebsite, ph: 'Website (recommended)' },
+          ].map((f, i) => (
+            <input
+              key={i}
+              type="text"
+              placeholder={f.ph}
+              value={f.v}
+              onChange={(e) => f.set(e.target.value)}
+              className="bg-slate-900/50 backdrop-blur-xl border border-slate-700/60 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/60"
+            />
+          ))}
         </div>
 
         <button
           onClick={runCheck}
           disabled={loading}
-          className="mb-8 px-6 py-3 bg-gradient-to-r from-cyan-500 to-purple-600 rounded-xl font-semibold text-white flex items-center gap-2 disabled:opacity-50"
+          className="mb-8 px-6 py-3 bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 rounded-xl font-semibold text-white flex items-center gap-2 disabled:opacity-50"
         >
           {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Search className="h-5 w-5" />}
-          {loading ? 'Running...' : 'Run Clinic Check'}
+          {loading ? 'Running\u2026' : 'Run Clinic Check'}
         </button>
 
         {error && (
-          <div className="mb-6 p-4 rounded-xl border border-red-500/30 bg-red-500/10 text-red-300">
-            {error}
-          </div>
+          <div className="mb-6 p-4 rounded-xl border border-red-500/30 bg-red-500/10 text-red-300">{error}</div>
         )}
 
         {report && (
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-2xl font-bold text-white">{report.clinic_name}</h2>
-                <p className="text-slate-400">{report.location} — {report.website || 'no website'}</p>
+                <p className="text-slate-400">{report.location} \u2014 {report.website || 'no website'}</p>
                 {report.target_service && (
                   <p className="text-pink-400 text-sm mt-1">Target service from site: {report.target_service}</p>
                 )}
                 {report.category_service && (
-                  <p className="text-amber-400 text-sm mt-1">Category-standard check: {report.category_service}</p>
+                  <p className="text-amber-400 text-sm">Category-standard check: {report.category_service}</p>
+                )}
+                {report.scraped_pages?.length > 0 && (
+                  <p className="text-slate-500 text-xs mt-1">
+                    Scraped: {report.scraped_pages.map(getDomain).length} page(s) \u2014 {report.scraped_pages.join(', ')}
+                  </p>
+                )}
+                {report.scrape_error && (
+                  <p className="text-amber-400/80 text-xs mt-1">Site scrape: {report.scrape_error}</p>
                 )}
               </div>
               <button
                 onClick={downloadPDF}
-                className="px-4 py-2 border border-cyan-500/30 text-cyan-400 rounded-xl flex items-center gap-2 hover:bg-cyan-500/10"
+                className="shrink-0 px-4 py-2 border border-cyan-500/30 text-cyan-400 rounded-xl flex items-center gap-2 hover:bg-cyan-500/10"
               >
                 <Download className="h-4 w-4" />
                 Download PDF
               </button>
             </div>
 
+            {report.report_grade === 'probe_only' && (
+              <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 flex gap-3">
+                <Info className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
+                <div className="text-sm text-amber-200">
+                  <strong>Probe only.</strong> Fewer than two engines answered, so this is not a
+                  finished report. Do not send absence or contradiction findings to a clinic on one
+                  engine alone.
+                </div>
+              </div>
+            )}
+
             <div className="flex flex-wrap gap-3">
               {report.engine_status.map((e) => (
                 <span
                   key={e.engine}
+                  title={e.error || ''}
                   className={`px-3 py-1 rounded-lg text-xs border ${
                     e.status === 'ok'
                       ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10'
+                      : e.status === 'partial'
+                      ? 'border-sky-500/30 text-sky-400 bg-sky-500/10'
                       : e.status === 'quota'
                       ? 'border-amber-500/30 text-amber-400 bg-amber-500/10'
                       : 'border-red-500/30 text-red-400 bg-red-500/10'
                   }`}
                 >
-                  {e.engine} {e.status === 'ok' ? '✓' : e.status === 'quota' ? 'quota' : '✗'}
+                  {e.engine} {e.answered}/{e.of}
                 </span>
               ))}
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[
-                { key: 'contradiction', label: 'Contradictions' },
-                { key: 'unsupported', label: 'Unsupported' },
-                { key: 'source_conflict', label: 'Source Conflicts' },
-                { key: 'foreign_source', label: 'Foreign Sources' },
-                { key: 'confirmed', label: 'Confirmed' },
-                { key: 'cant_confirm', label: "Can't Confirm" },
-              ].map(({ key, label }) => {
-                const statusKey = key as Claim['status']
-                const cfg = STATUS_CONFIG[statusKey]
-                return (
-                  <div key={key} className="rounded-xl border border-slate-700/50 bg-slate-900/50 p-4 text-center">
-                    <div className="text-2xl font-bold" style={{ color: cfg.color }}>{report.summary[key as keyof Report['summary']]}</div>
-                    <div className="text-xs text-slate-400 mt-1">{label}</div>
-                  </div>
-                )
-              })}
+            <div>
+              <div className="text-xs uppercase tracking-wide text-slate-500 mb-2">Findings</div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {FINDING_TILES.map((k) => {
+                  const cfg = STATUS_CONFIG[k]
+                  return (
+                    <div key={k} className="rounded-xl border border-slate-700/50 bg-slate-900/50 backdrop-blur-xl p-4 text-center">
+                      <div className="text-2xl font-bold" style={{ color: cfg.color }}>{report.summary[k]}</div>
+                      <div className="text-xs text-slate-400 mt-1">{TILE_LABELS[k]}</div>
+                    </div>
+                  )
+                })}
+              </div>
+              <div className="text-xs uppercase tracking-wide text-slate-500 mt-6 mb-2">Context</div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {CONTEXT_TILES.map((k) => {
+                  const cfg = STATUS_CONFIG[k]
+                  return (
+                    <div key={k} className="rounded-xl border border-slate-800/60 bg-slate-900/30 p-4 text-center">
+                      <div className="text-2xl font-bold" style={{ color: cfg.color }}>{report.summary[k]}</div>
+                      <div className="text-xs text-slate-500 mt-1">{TILE_LABELS[k]}</div>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
 
             <div className="space-y-4">
@@ -301,55 +364,62 @@ export default function ClinicCheckPage() {
                 const cfg = STATUS_CONFIG[claim.status]
                 const Icon = cfg.icon
                 return (
-                  <div key={i} className="rounded-xl border border-slate-700/50 bg-slate-900/50 overflow-hidden">
+                  <div key={i} className="rounded-xl border border-slate-700/50 bg-slate-900/50 backdrop-blur-xl overflow-hidden">
                     <div className="p-5 flex gap-4">
-                      <div className="mt-1">
-                        <Icon className="h-5 w-5" style={{ color: cfg.color }} />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
+                      <Icon className="h-5 w-5 mt-1 shrink-0" style={{ color: cfg.color }} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2 flex-wrap">
                           <span
                             className="px-2.5 py-0.5 rounded-md text-xs font-bold"
                             style={{ color: cfg.color, backgroundColor: `${cfg.color}15`, border: `1px solid ${cfg.color}30` }}
                           >
                             {cfg.label}
                           </span>
+                          {claim.engines.length > 1 && (
+                            <span className={`px-2 py-0.5 rounded-md text-[10px] border ${
+                              claim.agreement
+                                ? 'border-emerald-500/30 text-emerald-400'
+                                : 'border-amber-500/30 text-amber-400'
+                            }`}>
+                              {claim.agreement ? 'engines agree' : 'engines disagree'}
+                            </span>
+                          )}
                         </div>
-                        <p className="text-white font-medium mb-3">{claim.question}</p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                          <div>
-                            <div className="text-cyan-400 text-xs font-bold uppercase mb-1">AI Says</div>
-                            <p className="text-slate-300">{claim.ai_answer}</p>
-                          </div>
-                          <div>
-                            <div className="text-purple-400 text-xs font-bold uppercase mb-1">Site Says</div>
-                            <p className="text-slate-300">{claim.site_fact || 'No extractable fact'}</p>
-                          </div>
+
+                        <p className="text-white font-medium mb-1">{claim.question}</p>
+                        <p className="text-slate-400 text-sm mb-4">{claim.reason}</p>
+
+                        <div className="space-y-3">
+                          {claim.engines.map((e, j) => {
+                            const ecfg = STATUS_CONFIG[e.status]
+                            return (
+                              <div key={j} className="rounded-lg border border-slate-800 bg-black/20 p-3">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-xs font-bold text-cyan-400">{e.engine}</span>
+                                  <span className="text-[10px] font-semibold" style={{ color: ecfg.color }}>
+                                    {ecfg.label}
+                                  </span>
+                                </div>
+                                <p className="text-slate-300 text-sm">{e.answer}</p>
+                                {e.citations.length > 0 && (
+                                  <div className="flex flex-wrap gap-2 mt-2">
+                                    {e.citations.slice(0, 8).map((c, k) => (
+                                      <a
+                                        key={k}
+                                        href={c}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-[11px] text-purple-300 hover:text-purple-200 underline"
+                                      >
+                                        {getDomain(c)}
+                                      </a>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
                         </div>
-                        {claim.directory_citations.length > 0 && (
-                          <div className="mt-3 p-3 rounded-lg border border-purple-500/20 bg-purple-500/10">
-                            <div className="text-purple-400 text-xs font-bold uppercase mb-1">Directory Sources</div>
-                            <div className="flex flex-wrap gap-2">
-                              {claim.directory_citations.map((c, j) => (
-                                <a key={j} href={c} target="_blank" rel="noreferrer" className="text-xs text-purple-300 hover:text-purple-200 underline">
-                                  {getDomain(c)}
-                                </a>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        {claim.foreign_citations.length > 0 && claim.official_citations.length === 0 && claim.directory_citations.length === 0 && (
-                          <div className="mt-3 p-3 rounded-lg border border-pink-500/20 bg-pink-500/10">
-                            <div className="text-pink-400 text-xs font-bold uppercase mb-1">Foreign Sources</div>
-                            <div className="flex flex-wrap gap-2">
-                              {claim.foreign_citations.map((c, j) => (
-                                <a key={j} href={c} target="_blank" rel="noreferrer" className="text-xs text-pink-300 hover:text-pink-200 underline">
-                                  {getDomain(c)}
-                                </a>
-                              ))}
-                            </div>
-                          </div>
-                        )}
                       </div>
                     </div>
                   </div>
@@ -361,13 +431,4 @@ export default function ClinicCheckPage() {
       </div>
     </div>
   )
-}
-
-function getDomain(url: string): string {
-  try {
-    const hostname = new URL(url.startsWith('http') ? url : `https://${url}`).hostname
-    return hostname.replace(/^www\./, '')
-  } catch {
-    return url
-  }
 }
