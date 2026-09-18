@@ -1,4 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import {
+  VERTICALS, detectVertical, extractServicesFromSite, pickTargetService,
+  buildQuestions, extractServiceArea, extractCredentials, claimsEmergency,
+  type Vertical, type UniversalCheck,
+} from '@/lib/verticals'
 
 export const runtime = 'nodejs'
 export const maxDuration = 300
@@ -14,15 +19,6 @@ const DIRECTORY_DOMAINS = [
   'birdeye.com', 'tripadvisor.com', 'nextdoor.com', 'groupon.com', 'booksy.com',
 ]
 
-const CATEGORY_STANDARD_SERVICES: Record<string, string> = {
-  default: 'Morpheus8',
-}
-
-const HIGH_TICKET_SERVICES = [
-  'morpheus8', 'morpheus 8', 'ultherapy', 'emsculpt', 'sculptra', 'coolsculpting',
-  'cooltone', 'thread lift', 'kybella', 'prp', 'laser hair removal', 'dermal fillers',
-  'microneedling', 'hydrafacial', 'chemical peel', 'botox',
-]
 
 /* ------------------------------------------------------------------ *
  * Verdict model
@@ -41,6 +37,12 @@ export type ClaimStatus =
   | 'partial'
   | 'cant_confirm'
   | 'confirmed'
+
+/** Every configured service across all verticals — used only to spot an
+ *  answer naming something the business's own site never mentions. */
+const VERTICAL_ALL_SERVICES: string[] = Array.from(
+  new Set(Object.values(VERTICALS).flatMap((v) => v.services))
+)
 
 const SEVERITY: ClaimStatus[] = [
   'contradiction',
@@ -251,9 +253,9 @@ function extractPrices(text: string): number[] {
   return Array.from(new Set(raw.map((p) => parseFloat(p.replace(/[$,\s]/g, '')))))
 }
 
-function extractServices(text: string): string[] {
+function extractServices(text: string, vocabulary: string[]): string[] {
   const lower = text.toLowerCase()
-  return HIGH_TICKET_SERVICES.filter((s) => lower.includes(s))
+  return vocabulary.filter((s) => lower.includes(s.toLowerCase()))
 }
 
 function extractAddress(text: string): string | null {
@@ -275,24 +277,20 @@ function normalizeAddress(a: string): string {
     .replace(/[^a-z0-9]/g, '')
 }
 
-type QuestionKind = 'hours' | 'contact' | 'service' | 'services' | 'booking'
-
-function questionKind(q: string, targetService: string | null, categoryService: string | null): QuestionKind {
-  const l = q.toLowerCase()
-  if (l.includes('hour')) return 'hours'
-  if (l.includes('phone') || l.includes('address')) return 'contact'
-  if (l.includes('book') || l.includes('appointment')) return 'booking'
-  if (targetService && l.includes(targetService.toLowerCase())) return 'service'
-  if (categoryService && l.includes(categoryService.toLowerCase())) return 'service'
-  return 'services'
-}
-
 function namedService(q: string, targetService: string | null, categoryService: string | null): string | null {
   const l = q.toLowerCase()
   if (targetService && l.includes(targetService.toLowerCase())) return targetService
   if (categoryService && l.includes(categoryService.toLowerCase())) return categoryService
   return null
 }
+
+/** Business-name tokens that carry no identifying signal in any vertical. */
+const GENERIC_NAME_TOKENS = [
+  'medical', 'spa', 'clinic', 'aesthetics', 'center', 'centre', 'plumbing',
+  'electric', 'electrical', 'heating', 'cooling', 'hvac', 'roofing', 'dental',
+  'services', 'service', 'company', 'group', 'llc', 'inc', 'corp', 'associates',
+  'solutions', 'contractors', 'construction', 'brothers', 'sons', 'the', 'and',
+]
 
 const HEDGES = [
   "i don't have", "i do not have", "i don't see", "i couldn't find", "cannot find",
@@ -309,7 +307,7 @@ function mentionsClinic(answer: string, clinicName: string): boolean {
   const tokens = clinicName
     .toLowerCase()
     .split(/\s+/)
-    .filter((t) => t.length > 3 && !['medical', 'spa', 'clinic', 'aesthetics', 'center'].includes(t))
+    .filter((t) => t.length > 3 && !GENERIC_NAME_TOKENS.includes(t))
   if (tokens.length === 0) return answer.toLowerCase().includes(clinicName.toLowerCase())
   return tokens.some((t) => answer.toLowerCase().includes(t))
 }
@@ -326,16 +324,20 @@ export function classifyClaim(opts: {
   answer: string
   citations: string[]
   question: string
-  clinicName: string
-  clinicDomain: string
+  check: UniversalCheck
+  businessName: string
+  businessDomain: string
   siteContent: string
+  siteServices: string[]
   targetService: string | null
   categoryService: string | null
 }): { status: ClaimStatus; reason: string } {
   const {
-    answer, citations, question, clinicName, clinicDomain,
-    siteContent, targetService, categoryService,
+    answer, citations, question, check, businessName, businessDomain,
+    siteContent, siteServices, targetService, categoryService,
   } = opts
+  const clinicName = businessName
+  const clinicDomain = businessDomain
 
   const official = citations.filter((c) => isOfficialCitation(c, clinicDomain))
   const directory = citations.filter(isDirectoryCitation)
@@ -357,13 +359,12 @@ export function classifyClaim(opts: {
     }
   }
 
-  const kind = questionKind(question, targetService, categoryService)
   const hasSite = siteContent.trim().length > 0
 
   if (!hasSite) return { status: 'cant_confirm', reason: 'No site content to compare against.' }
 
   /* ---- hours ---- */
-  if (kind === 'hours') {
+  if (check === 'hours') {
     const aiTimes = extractTimes(answer)
     const siteTimes = extractTimes(siteContent)
     if (aiTimes.length === 0 || siteTimes.length === 0) {
@@ -385,7 +386,7 @@ export function classifyClaim(opts: {
   }
 
   /* ---- phone / address / booking ---- */
-  if (kind === 'contact' || kind === 'booking') {
+  if (check === 'contact' || check === 'booking') {
     const aiPhones = extractPhones(answer)
     const sitePhones = extractPhones(siteContent)
     const aiAddr = extractAddress(answer)
@@ -410,7 +411,7 @@ export function classifyClaim(opts: {
   }
 
   /* ---- one named service ---- */
-  if (kind === 'service') {
+  if (check === 'named_service' || check === 'category_probe') {
     const service = (namedService(question, targetService, categoryService) || '').toLowerCase()
     const aiSaysYes = answer.toLowerCase().includes(service) && !/does not (?:appear to )?offer|no (?:public )?(?:evidence|indication)/i.test(answer)
     const siteHasIt = siteContent.toLowerCase().includes(service)
@@ -441,14 +442,93 @@ export function classifyClaim(opts: {
     return { status: 'cant_confirm', reason: 'Neither side asserts the service.' }
   }
 
-  /* ---- general services ---- */
-  const aiServices = extractServices(answer)
-  const siteServices = extractServices(siteContent)
-  if (siteServices.length === 0) {
-    return { status: 'cant_confirm', reason: 'No recognisable services on the site.' }
+  /* ---- service area (trades) ---- */
+  if (check === 'service_area') {
+    const aiAreas = extractServiceArea(answer).map((a) => a.toLowerCase())
+    const siteAreas = extractServiceArea(siteContent).map((a) => a.toLowerCase())
+    if (siteAreas.length === 0 || aiAreas.length === 0) {
+      return { status: 'cant_confirm', reason: 'No stated service area on one side.' }
+    }
+    const invented = aiAreas.filter((a) => !siteAreas.some((s) => s.includes(a) || a.includes(s)))
+    if (invented.length > 0) {
+      return {
+        status: 'unsupported',
+        reason: `AI claims coverage the site does not state: ${invented.slice(0, 6).join(', ')}.`,
+      }
+    }
+    const missed = siteAreas.filter((a) => !aiAreas.some((s) => s.includes(a) || a.includes(s)))
+    if (missed.length > 0) {
+      return { status: 'partial', reason: `AI omits areas the site lists: ${missed.slice(0, 6).join(', ')}.` }
+    }
+    return { status: 'confirmed', reason: 'Service area matches the site.' }
   }
-  const invented = aiServices.filter((s) => !siteServices.includes(s))
+
+  /* ---- credentials / license numbers ---- */
+  if (check === 'credentials') {
+    const aiLic = extractCredentials(answer)
+    const siteLic = extractCredentials(siteContent)
+    if (aiLic.length === 0) {
+      return { status: 'cant_confirm', reason: 'AI states no license number.' }
+    }
+    if (siteLic.length === 0) {
+      // A fabricated licence number is the most damaging thing AI can say
+      // about a trade. Never let this pass as confirmed.
+      return {
+        status: 'unsupported',
+        reason: `AI states license ${aiLic.join(', ')} with no basis on the site.`,
+      }
+    }
+    const wrong = aiLic.filter((l) => !siteLic.includes(l))
+    if (wrong.length > 0) {
+      return { status: 'contradiction', reason: `AI states license ${wrong.join(', ')}; the site states ${siteLic.join(', ')}.` }
+    }
+    return { status: 'confirmed', reason: 'License number matches the site.' }
+  }
+
+  /* ---- emergency / after-hours availability ---- */
+  if (check === 'emergency') {
+    const aiYes = /\b(?:yes|24[\/\s-]?7|24 hours|emergency service|after[- ]hours)\b/i.test(answer)
+      && !/\b(?:no|does not|doesn't|not offer)\b/i.test(answer.slice(0, 120))
+    const siteYes = claimsEmergency(siteContent)
+    if (aiYes && siteYes) return { status: 'confirmed', reason: 'Emergency availability matches the site.' }
+    if (aiYes && !siteYes) {
+      return { status: 'unsupported', reason: 'AI claims emergency availability the site never states.' }
+    }
+    if (!aiYes && siteYes) {
+      return { status: 'cant_confirm', reason: 'AI could not confirm emergency service the site advertises.' }
+    }
+    return { status: 'cant_confirm', reason: 'Neither side claims emergency service.' }
+  }
+
+  /* ---- pricing ---- */
+  if (check === 'pricing') {
+    const aiPrices = extractPrices(answer)
+    const sitePrices = extractPrices(siteContent)
+    if (aiPrices.length === 0) return { status: 'cant_confirm', reason: 'AI states no prices.' }
+    if (sitePrices.length === 0) {
+      return {
+        status: 'unsupported',
+        reason: `AI states prices with no basis on the site: ${aiPrices.slice(0, 6).map((p) => `$${p}`).join(', ')}.`,
+      }
+    }
+    const unbacked = aiPrices.filter((p) => !sitePrices.includes(p))
+    if (unbacked.length > 0) {
+      return { status: 'unsupported', reason: `Prices not on the site: ${unbacked.slice(0, 6).map((p) => `$${p}`).join(', ')}.` }
+    }
+    return { status: 'confirmed', reason: 'Stated prices match the site.' }
+  }
+
+  /* ---- general services ---- */
+  const aiServices = extractServices(answer, siteServices)
+  if (siteServices.length === 0) {
+    return { status: 'cant_confirm', reason: 'No services could be read from the site.' }
+  }
   const missed = siteServices.filter((s) => !aiServices.includes(s))
+  // Anything the AI names that is not on the site, checked against the
+  // site's own vocabulary rather than a fixed industry list.
+  const invented = extractServices(answer, VERTICAL_ALL_SERVICES).filter(
+    (s) => !siteServices.map((x) => x.toLowerCase()).includes(s.toLowerCase())
+  )
   if (invented.length > 0) {
     return { status: 'unsupported', reason: `AI lists services the site does not: ${invented.join(', ')}.` }
   }
@@ -467,20 +547,18 @@ export function classifyClaim(opts: {
  * Handler
  * ------------------------------------------------------------------ */
 
-function extractTargetService(siteContent: string): string | null {
-  const lower = siteContent.toLowerCase()
-  for (const s of HIGH_TICKET_SERVICES) if (lower.includes(s)) return s
-  return null
-}
-
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { clinic_name, location, website, category = 'default' } = body
+    // clinic_name kept for back-compat; business_name is the new name.
+    const business_name = body.business_name || body.clinic_name
+    const { location, website } = body
+    const verticalHint: string | undefined = body.vertical || body.category
 
-    if (!clinic_name || !location) {
-      return NextResponse.json({ error: 'clinic_name and location are required' }, { status: 400 })
+    if (!business_name || !location) {
+      return NextResponse.json({ error: 'business_name and location are required' }, { status: 400 })
     }
+    const clinic_name = business_name
 
     const clinicDomain = website ? getDomain(website) : ''
 
@@ -498,19 +576,19 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const targetService = extractTargetService(siteContent)
-    const categoryService = CATEGORY_STANDARD_SERVICES[category] || CATEGORY_STANDARD_SERVICES.default
+    // Vertical is detected from the business's own site, not assumed.
+    const vertical: Vertical = detectVertical(siteContent, verticalHint)
+    const siteServices = extractServicesFromSite(siteContent, vertical)
+    const targetService = pickTargetService(siteServices, vertical)
+    const categoryService = vertical.categoryStandard || null
 
-    const questions = [
-      `What are ${clinic_name} hours in ${location}?`,
-      targetService
-        ? `Does ${clinic_name} offer ${targetService}, and what does it cost?`
-        : `What treatments does ${clinic_name} offer in ${location}?`,
-      `Does ${clinic_name} offer ${categoryService}, and what does it cost?`,
-      `How do I book a first appointment at ${clinic_name} in ${location}?`,
-      `What is ${clinic_name} phone number and address in ${location}?`,
-      `What treatments or services does ${clinic_name} offer in ${location}?`,
-    ]
+    const questionSpecs = buildQuestions({
+      business: clinic_name,
+      location,
+      vertical,
+      targetService,
+    })
+    const questions = questionSpecs.map((q) => q.text)
 
     const active = ENGINES.filter((e) => e.enabled)
 
@@ -561,7 +639,7 @@ export async function POST(req: NextRequest) {
       not_named: 0, partial: 0, cant_confirm: 0, confirmed: 0,
     }
 
-    const claims = questions.map((question, i) => {
+    const claims = questionSpecs.map(({ text: question, check }, i) => {
       const perEngine = runs
         .map((r) => {
           const a = r.answers[i]
@@ -570,9 +648,11 @@ export async function POST(req: NextRequest) {
             answer: a.value.text,
             citations: a.value.citations,
             question,
-            clinicName: clinic_name,
-            clinicDomain,
+            check,
+            businessName: clinic_name,
+            businessDomain: clinicDomain,
             siteContent,
+            siteServices,
             targetService,
             categoryService,
           })
@@ -592,6 +672,7 @@ export async function POST(req: NextRequest) {
         summary.cant_confirm++
         return {
           question,
+          check,
           status: 'cant_confirm' as ClaimStatus,
           reason: 'No engine answered this question.',
           engines: [],
@@ -607,6 +688,7 @@ export async function POST(req: NextRequest) {
 
       return {
         question,
+        check,
         status,
         reason: decisive.reason,
         engines: perEngine,
@@ -629,7 +711,11 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
-      clinic_name,
+      business_name: clinic_name,
+      clinic_name, // back-compat
+      vertical: vertical.id,
+      vertical_label: vertical.label,
+      site_services: siteServices,
       location,
       website: website || null,
       clinic_domain: clinicDomain || null,

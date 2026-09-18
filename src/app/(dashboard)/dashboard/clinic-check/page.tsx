@@ -29,6 +29,7 @@ interface EngineClaim {
 
 interface Claim {
   question: string
+  check: string
   status: ClaimStatus
   reason: string
   engines: EngineClaim[]
@@ -43,7 +44,11 @@ interface Claim {
 
 interface Report {
   id: string
+  business_name: string
   clinic_name: string
+  vertical: string
+  vertical_label: string
+  site_services: string[]
   location: string
   website: string | null
   target_service: string | null
@@ -114,7 +119,7 @@ export default function ClinicCheckPage() {
       const res = await fetch('/api/clinic-check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clinic_name: clinicName, location, website }),
+        body: JSON.stringify({ business_name: clinicName, location, website }),
       })
       if (!res.ok) {
         const err = await res.json()
@@ -144,12 +149,12 @@ export default function ClinicCheckPage() {
     doc.setTextColor(244, 114, 182)
     doc.setFontSize(22)
     doc.setFont('helvetica', 'bold')
-    doc.text('Clinic AI Check', m, y)
+    doc.text('Business AI Check', m, y)
     y += 28
 
     doc.setTextColor(226, 232, 240)
     doc.setFontSize(14)
-    doc.text(report.clinic_name, m, y)
+    doc.text(report.business_name || report.clinic_name, m, y)
     y += 16
     doc.setFontSize(10)
     doc.setTextColor(148, 163, 184)
@@ -225,7 +230,7 @@ export default function ClinicCheckPage() {
       y += 132
     }
 
-    doc.save(`clinic-check-${report.clinic_name.toLowerCase().replace(/\s+/g, '-')}.pdf`)
+    doc.save(`ai-check-${(report.business_name || report.clinic_name).toLowerCase().replace(/\s+/g, '-')}.pdf`)
   }
 
   return (
@@ -236,14 +241,14 @@ export default function ClinicCheckPage() {
             <Stethoscope className="h-6 w-6 text-white" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-white">Clinic AI Check</h1>
-            <p className="text-slate-400">One clinic. Six questions. What AI can and cannot verify.</p>
+            <h1 className="text-3xl font-bold text-white">Business AI Check</h1>
+            <p className="text-slate-400">One business. What AI can and cannot verify about it.</p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           {[
-            { v: clinicName, set: setClinicName, ph: 'Clinic name' },
+            { v: clinicName, set: setClinicName, ph: 'Business name' },
             { v: location, set: setLocation, ph: 'Location (e.g. Oakdale MN)' },
             { v: website, set: setWebsite, ph: 'Website (recommended)' },
           ].map((f, i) => (
@@ -275,10 +280,23 @@ export default function ClinicCheckPage() {
           <div className="space-y-6">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-2xl font-bold text-white">{report.clinic_name}</h2>
+                <div className="flex items-center gap-3">
+                  <h2 className="text-2xl font-bold text-white">{report.business_name || report.clinic_name}</h2>
+                  {report.vertical_label && (
+                    <span className="px-2.5 py-0.5 rounded-md text-xs border border-cyan-500/30 text-cyan-400 bg-cyan-500/10">
+                      {report.vertical_label}
+                    </span>
+                  )}
+                </div>
                 <p className="text-slate-400">{report.location} \u2014 {report.website || 'no website'}</p>
+                {report.site_services?.length > 0 && (
+                  <p className="text-slate-500 text-xs mt-1">
+                    Services read from site ({report.site_services.length}): {report.site_services.slice(0, 8).join(', ')}
+                    {report.site_services.length > 8 ? '\u2026' : ''}
+                  </p>
+                )}
                 {report.target_service && (
-                  <p className="text-pink-400 text-sm mt-1">Target service from site: {report.target_service}</p>
+                  <p className="text-pink-400 text-sm mt-1">Probed service from site: {report.target_service}</p>
                 )}
                 {report.category_service && (
                   <p className="text-amber-400 text-sm">Category-standard check: {report.category_service}</p>
@@ -375,6 +393,11 @@ export default function ClinicCheckPage() {
                           >
                             {cfg.label}
                           </span>
+                          {claim.check && (
+                            <span className="px-2 py-0.5 rounded-md text-[10px] border border-slate-700 text-slate-500 uppercase tracking-wide">
+                              {claim.check.replace(/_/g, ' ')}
+                            </span>
+                          )}
                           {claim.engines.length > 1 && (
                             <span className={`px-2 py-0.5 rounded-md text-[10px] border ${
                               claim.agreement
