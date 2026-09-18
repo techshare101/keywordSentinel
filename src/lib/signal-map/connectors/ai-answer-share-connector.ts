@@ -1,4 +1,5 @@
 import type { SignalConnector, SignalConnectorInput, SignalConnectorResult } from '@/types/signal-map'
+import { extractSearchQuery } from '../utils'
 import OpenAI from 'openai'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
@@ -85,13 +86,14 @@ export class AIAnswerShareConnector implements SignalConnector {
   }
 
   private generateQueries(icp: string, domains: string[]): string[] {
+    const cleanQuery = extractSearchQuery(icp, 80)
     const queries = []
-    queries.push(`What are the best ${icp} services?`)
-    queries.push(`Who are the top ${icp} companies?`)
-    queries.push(`Recommend me good ${icp} providers`)
-    queries.push(`What ${icp} should I use?`)
-    queries.push(`Best ${icp} for small business`)
-    queries.push(`Most recommended ${icp}`)
+    queries.push(`What are the best ${cleanQuery} services?`)
+    queries.push(`Who are the top ${cleanQuery} companies?`)
+    queries.push(`Recommend me good ${cleanQuery} providers`)
+    queries.push(`What ${cleanQuery} should I use?`)
+    queries.push(`Best ${cleanQuery} for small business`)
+    queries.push(`Most recommended ${cleanQuery}`)
     
     if (domains.length > 0) {
       queries.push(`What do you think about ${domains[0]}?`)

@@ -13,6 +13,7 @@ import type {
   SignalConnectorResult,
   DiscussionVenue 
 } from '@/types/signal-map'
+import { extractSearchQuery } from '../utils'
 
 const REDDIT_HEADERS = {
   'User-Agent': 'KeywordSentinel/1.0 (ICP Signal Map)',
@@ -148,24 +149,27 @@ export class RedditConnector implements SignalConnector {
   }
 
   private extractSearchTerms(description: string): string[] {
-    // Simple extraction: split on commas, "and", "or", take meaningful phrases
-    const terms = description
+    const query = extractSearchQuery(description, 100)
+    if (!query) return []
+
+    // Split on commas and common separators
+    const terms = query
       .toLowerCase()
       .split(/[,\n]/)
       .map(t => t.trim())
       .filter(t => t.length > 3 && t.length < 100)
       .slice(0, 5)
 
-    // Also extract 2-3 word phrases
-    const words = description.toLowerCase().split(/\s+/)
+    // Also extract 2-3 word phrases from the query
+    const words = query.toLowerCase().split(/\s+/)
     const phrases: string[] = []
     for (let i = 0; i < words.length - 1; i++) {
       const phrase = `${words[i]} ${words[i + 1]}`
-      if (phrase.length > 5 && !['the a', 'is a', 'of the', 'in the'].includes(phrase)) {
+      if (phrase.length > 5 && !['the a', 'is a', 'of the', 'in the', 'to the'].includes(phrase)) {
         phrases.push(phrase)
       }
     }
 
-    return [...new Set([...terms, ...phrases.slice(0, 3)])]
+    return [...new Set([query, ...terms, ...phrases.slice(0, 3)])]
   }
 }

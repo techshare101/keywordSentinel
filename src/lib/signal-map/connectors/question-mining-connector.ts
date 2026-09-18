@@ -1,4 +1,5 @@
 import type { SignalConnector, SignalConnectorInput, SignalConnectorResult } from '@/types/signal-map'
+import { extractSearchQuery } from '../utils'
 import Firecrawl from '@mendable/firecrawl-js'
 
 const firecrawl = new Firecrawl({ apiKey: process.env.FIRECRAWL_API_KEY! })
@@ -15,12 +16,15 @@ export class QuestionMiningConnector implements SignalConnector {
     const rawFetches = []
     const sources = []
 
+    // Use a clean, short query extracted from the ICP description
+    const cleanQuery = extractSearchQuery(icp_description, 100)
+
     // Strategy 1: Search Google for ICP + "how to" / "what is" patterns
     const searchQueries = [
-      `${icp_description} how to`,
-      `${icp_description} what is`,
-      `${icp_description} why`,
-      `${icp_description} best practices`,
+      `${cleanQuery} how to`,
+      `${cleanQuery} what is`,
+      `${cleanQuery} why`,
+      `${cleanQuery} best practices`,
     ]
 
     for (const query of searchQueries.slice(0, 3)) {

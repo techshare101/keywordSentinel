@@ -1,16 +1,7 @@
 import type { SignalConnector, SignalConnectorInput, SignalConnectorResult, Podcast } from '@/types/signal-map'
-import { fetchWithTimeout } from '../utils'
+import { fetchWithTimeout, extractSearchQuery } from '../utils'
 
 const TREG_URL = 'https://treg.to'
-
-function extractSearchQuery(icp_description: string): string {
-  // Take first 150 chars of ICP description, removing newlines and extra spaces
-  return icp_description
-    .replace(/\n/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 150)
-}
 
 export class PodcastsConnector implements SignalConnector {
   id = 'podcasts'

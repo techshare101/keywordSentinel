@@ -1,17 +1,7 @@
 import type { SignalConnector, SignalConnectorInput, SignalConnectorResult, YouTubeChannel } from '@/types/signal-map'
-import { fetchWithTimeout } from '../utils'
+import { fetchWithTimeout, extractSearchQuery } from '../utils'
 
 const TREG_URL = 'https://treg.to'
-
-function extractSearchQuery(icp_description: string): string {
-  // Take first 150 chars of ICP description, removing newlines and extra spaces
-  // YouTube API has a 200 char limit on keyword
-  return icp_description
-    .replace(/\n/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 150)
-}
 
 function parseSubscriberCount(text: string | undefined): number | undefined {
   if (!text) return undefined

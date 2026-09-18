@@ -8,6 +8,7 @@
  */
 
 import type { SignalConnector, SignalConnectorInput, SignalConnectorResult, TechStackItem } from '@/types/signal-map'
+import { extractDomainsFromICP } from '../utils'
 import Firecrawl from '@mendable/firecrawl-js'
 
 const firecrawl = new Firecrawl({ apiKey: process.env.FIRECRAWL_API_KEY || '' })
@@ -59,9 +60,12 @@ export class TechStackConnector implements SignalConnector {
   section_type = 'tech_stack' as const
 
   async fetch(input: SignalConnectorInput): Promise<SignalConnectorResult> {
-    const { seed_domains, report_id } = input
+    const { icp_description, seed_domains, report_id } = input
 
-    if (seed_domains.length === 0) {
+    // Auto-extract domains from ICP if none provided
+    const effectiveDomains = seed_domains.length > 0 ? seed_domains : extractDomainsFromICP(icp_description)
+
+    if (effectiveDomains.length === 0) {
       return {
         section_type: this.section_type,
         status: 'no_data',
@@ -77,7 +81,7 @@ export class TechStackConnector implements SignalConnector {
     const sources = []
 
     // Scrape each seed domain (homepage)
-    for (const domain of seed_domains.slice(0, 3)) {
+    for (const domain of effectiveDomains.slice(0, 3)) {
       const url = `https://${domain}`
       const startTime = Date.now()
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getAllConnectors } from '@/lib/signal-map/connectors'
+import { extractDomainsFromICP } from '@/lib/signal-map/utils'
 import type { SignalSection, SignalRawFetch } from '@/types/signal-map'
 
 export const runtime = 'nodejs'
@@ -15,11 +16,20 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { icp_description, seed_domains = [] } = body
+  const { icp_description, seed_domains: rawSeedDomains = [] } = body
 
   if (!icp_description || icp_description.trim().length < 10) {
     return NextResponse.json({ error: 'ICP description must be at least 10 characters' }, { status: 400 })
   }
+
+  // Clean provided seed domains and auto-extract from ICP if none provided
+  const cleanedSeedDomains = rawSeedDomains.map((d: string) => 
+    d.trim().replace(/^https?:\/\//, '').replace(/\/$/, '')
+  ).filter(Boolean)
+
+  const effectiveSeedDomains = cleanedSeedDomains.length > 0 
+    ? cleanedSeedDomains 
+    : extractDomainsFromICP(icp_description)
 
   // Create the report
   const { data: report, error: reportError } = await supabase
@@ -27,7 +37,7 @@ export async function POST(req: NextRequest) {
     .insert({
       user_id: user.id,
       icp_description: icp_description.trim(),
-      seed_domains: seed_domains.map((d: string) => d.trim().replace(/^https?:\/\//, '').replace(/\/$/, '')),
+      seed_domains: effectiveSeedDomains,
       status: 'running',
       started_at: new Date().toISOString(),
     })
