@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Radar, Sparkles, Globe, MessageCircle, Bot, Loader2, Zap, Headphones, Youtube, ExternalLink } from 'lucide-react'
+import { Radar, Sparkles, Globe, MessageCircle, Bot, Loader2, Zap, Headphones, Youtube, ExternalLink, Download } from 'lucide-react'
+import jsPDF from 'jspdf'
 
 function formatNumber(num: number): string {
   if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M'
@@ -100,6 +101,226 @@ export default function SignalMapPage() {
     return () => clearInterval(interval)
   }, [report])
 
+  const downloadPDF = () => {
+    if (!report) return
+
+    const doc = new jsPDF()
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const margin = 20
+    let y = margin
+
+    // Header
+    doc.setFillColor(10, 10, 15)
+    doc.rect(0, 0, pageWidth, 40, 'F')
+    
+    doc.setTextColor(0, 212, 255)
+    doc.setFontSize(24)
+    doc.setFont('helvetica', 'bold')
+    doc.text('ICP Signal Map Report', margin, y + 10)
+    
+    doc.setTextColor(168, 85, 247)
+    doc.setFontSize(12)
+    doc.text(`Report ID: ${report.id.slice(0, 8)}...`, margin, y + 20)
+    doc.setTextColor(200, 200, 200)
+    doc.setFontSize(10)
+    doc.text(`Generated: ${new Date(report.created_at).toLocaleString()}`, margin, y + 28)
+    
+    y = 50
+
+    // ICP Description
+    doc.setTextColor(0, 212, 255)
+    doc.setFontSize(14)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Ideal Customer Profile', margin, y)
+    y += 8
+
+    doc.setTextColor(220, 220, 220)
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'normal')
+    const icpLines = doc.splitTextToSize(report.icp_description, pageWidth - 2 * margin)
+    doc.text(icpLines, margin, y)
+    y += icpLines.length * 5 + 5
+
+    // Seed Domains
+    if (report.seed_domains.length > 0) {
+      doc.setTextColor(168, 85, 247)
+      doc.setFontSize(12)
+      doc.setFont('helvetica', 'bold')
+      doc.text('Seed Domains:', margin, y)
+      y += 6
+      doc.setTextColor(200, 200, 200)
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'normal')
+      report.seed_domains.forEach((domain: string) => {
+        doc.text(`• ${domain}`, margin + 5, y)
+        y += 5
+      })
+      y += 5
+    }
+
+    // Status
+    doc.setTextColor(0, 212, 255)
+    doc.setFontSize(12)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Report Status:', margin, y)
+    if (report.status === 'completed') { doc.setTextColor(0, 255, 128) } else { doc.setTextColor(255, 180, 0) }
+    doc.text(report.status.toUpperCase(), margin + 35, y)
+    y += 15
+
+    // Sections
+    report.sections.forEach((section: any) => {
+      if (y > 250) {
+        doc.addPage()
+        y = margin
+      }
+
+      doc.setFillColor(15, 15, 20)
+      doc.rect(margin - 5, y - 5, pageWidth - 2 * margin + 10, 10, 'F')
+      
+      doc.setTextColor(0, 212, 255)
+      doc.setFontSize(13)
+      doc.setFont('helvetica', 'bold')
+      const title = section.section_type.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
+      doc.text(title, margin, y + 2)
+      
+      if (section.status === 'completed') { doc.setTextColor(0, 255, 128) } else if (section.status === 'partial') { doc.setTextColor(255, 180, 0) } else { doc.setTextColor(150, 150, 150) }
+      doc.setFontSize(9)
+      doc.text(section.status.toUpperCase(), pageWidth - margin - 20, y + 2)
+      
+      y += 12
+
+      doc.setTextColor(200, 200, 200)
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'normal')
+
+      if (section.status === 'no_data' || section.status === 'error') {
+        doc.text(section.error_message || 'No data available', margin, y)
+        y += 10
+      } else {
+        // Section-specific content
+        if (section.section_type === 'ai_answer_share' && section.data.queries) {
+          doc.setTextColor(236, 72, 153)
+          doc.setFont('helvetica', 'bold')
+          doc.text('Top Mentioned Businesses:', margin, y)
+          y += 5
+          doc.setTextColor(220, 220, 220)
+          doc.setFont('helvetica', 'normal')
+          
+          const mentions = section.data.business_mentions?.top_mentioned || []
+          mentions.slice(0, 10).forEach((m: any) => {
+            doc.text(`${m.name} (${m.count} mentions via ${m.engines.join(', ')})`, margin + 5, y)
+            y += 5
+            if (y > 270) { doc.addPage(); y = margin }
+          })
+          y += 5
+        }
+
+        if (section.section_type === 'podcasts' && section.data.podcasts) {
+          section.data.podcasts.slice(0, 8).forEach((p: any) => {
+            doc.setFont('helvetica', 'bold')
+            doc.text(p.name, margin, y)
+            doc.setFont('helvetica', 'normal')
+            doc.setTextColor(150, 150, 150)
+            const pubText = p.publisher ? ` — ${p.publisher}` : ''
+            const epText = p.total_episodes ? ` (${p.total_episodes} eps)` : ''
+            doc.text(`${pubText}${epText}`, margin + doc.getTextWidth(p.name), y)
+            doc.setTextColor(200, 200, 200)
+            y += 5
+            if (y > 270) { doc.addPage(); y = margin }
+          })
+        }
+
+        if (section.section_type === 'youtube_channels' && section.data.channels) {
+          section.data.channels.slice(0, 8).forEach((c: any) => {
+            doc.setFont('helvetica', 'bold')
+            doc.text(c.name, margin, y)
+            doc.setFont('helvetica', 'normal')
+            doc.setTextColor(150, 150, 150)
+            const subText = c.subscriber_count ? ` — ${formatNumber(c.subscriber_count)} subs` : ''
+            doc.text(subText, margin + doc.getTextWidth(c.name), y)
+            doc.setTextColor(200, 200, 200)
+            y += 5
+            if (y > 270) { doc.addPage(); y = margin }
+          })
+        }
+
+        if (section.section_type === 'question_mining' && section.data.questions) {
+          section.data.questions.slice(0, 10).forEach((q: any) => {
+            const qLines = doc.splitTextToSize(q.question, pageWidth - 2 * margin - 10)
+            doc.text(qLines, margin, y)
+            y += qLines.length * 4
+            doc.setTextColor(100, 150, 200)
+            doc.setFontSize(8)
+            doc.text(`Source: ${q.source}`, margin + 5, y)
+            doc.setTextColor(200, 200, 200)
+            doc.setFontSize(9)
+            y += 6
+            if (y > 270) { doc.addPage(); y = margin }
+          })
+        }
+
+        if (section.section_type === 'industry_hubs' && section.data.hubs) {
+          section.data.hubs.slice(0, 10).forEach((h: any) => {
+            doc.setFont('helvetica', 'bold')
+            doc.text(h.domain, margin, y)
+            doc.setFont('helvetica', 'normal')
+            doc.setTextColor(150, 150, 150)
+            doc.text(` — ${h.mention_count} mentions`, margin + doc.getTextWidth(h.domain), y)
+            doc.setTextColor(200, 200, 200)
+            y += 5
+            if (y > 270) { doc.addPage(); y = margin }
+          })
+        }
+
+        if (section.section_type === 'tech_stack' && section.data.stack) {
+          const byCat: any = {}
+          section.data.stack.forEach((t: any) => {
+            if (!byCat[t.category]) byCat[t.category] = []
+            byCat[t.category].push(t)
+          })
+          Object.entries(byCat).forEach(([cat, techs]: [string, any]) => {
+            doc.setTextColor(168, 85, 247)
+            doc.setFont('helvetica', 'bold')
+            doc.text(cat.toUpperCase(), margin, y)
+            doc.setTextColor(200, 200, 200)
+            doc.setFont('helvetica', 'normal')
+            y += 5
+            techs.slice(0, 5).forEach((t: any) => {
+              doc.text(`• ${t.name} (${t.confidence})`, margin + 5, y)
+              y += 5
+              if (y > 270) { doc.addPage(); y = margin }
+            })
+            y += 3
+          })
+        }
+
+        if (section.section_type === 'discussion_venues' && section.data.venues) {
+          section.data.venues.slice(0, 8).forEach((v: any) => {
+            doc.setFont('helvetica', 'bold')
+            doc.text(`r/${v.subreddit}`, margin, y)
+            doc.setFont('helvetica', 'normal')
+            doc.setTextColor(150, 150, 150)
+            doc.text(` — ${v.post_count} posts`, margin + doc.getTextWidth(`r/${v.subreddit}`), y)
+            doc.setTextColor(200, 200, 200)
+            y += 5
+            if (y > 270) { doc.addPage(); y = margin }
+          })
+        }
+      }
+
+      y += 8
+    })
+
+    // Footer
+    if (y > 260) { doc.addPage(); y = margin }
+    doc.setTextColor(100, 100, 100)
+    doc.setFontSize(8)
+    doc.text('Generated by KeywordSentinel ICP Signal Map', margin, 285)
+    doc.text(`Report ID: ${report.id}`, margin, 290)
+
+    doc.save(`signal-map-${report.id.slice(0, 8)}-${new Date().toISOString().split('T')[0]}.pdf`)
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -177,16 +398,27 @@ export default function SignalMapPage() {
       {/* Results */}
       {report && (
         <div className="space-y-6">
-          {/* Status Badge */}
-          <div className="flex items-center gap-2">
-            <div className={`h-2 w-2 rounded-full ${
-              report.status === 'completed' ? 'bg-emerald-500' :
-              report.status === 'partial' ? 'bg-amber-500' :
-              'bg-red-500'
-            }`} />
-            <span className="text-sm text-slate-400">
-              Report status: <span className="font-medium text-slate-200 capitalize">{report.status}</span>
-            </span>
+          {/* Status Badge + Download */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className={`h-2 w-2 rounded-full ${
+                report.status === 'completed' ? 'bg-emerald-500' :
+                report.status === 'partial' ? 'bg-amber-500' :
+                'bg-red-500'
+              }`} />
+              <span className="text-sm text-slate-400">
+                Report status: <span className="font-medium text-slate-200 capitalize">{report.status}</span>
+              </span>
+            </div>
+            <Button
+              onClick={downloadPDF}
+              variant="outline"
+              size="sm"
+              className="border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Download PDF
+            </Button>
           </div>
 
           {/* Section: Discussion Venues */}
