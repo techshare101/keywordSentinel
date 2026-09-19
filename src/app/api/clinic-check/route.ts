@@ -331,6 +331,28 @@ const GENERIC_NAME_TOKENS = [
   'solutions', 'contractors', 'construction', 'brothers', 'sons', 'the', 'and',
 ]
 
+/**
+ * An engine declining to answer is an abstention, not a finding.
+ *
+ * OpenAI without browsing answers most current-fact questions with
+ * "I don't have real-time access... check their website." Treating that
+ * as CAN'T CONFIRM let one engine's own limitation override another
+ * engine's verified CONFIRMED, which is why phone, booking and pricing
+ * came back CAN'T CONFIRM while Perplexity had matched every field.
+ */
+const ABSTENTIONS = [
+  "real-time", "real time", "don't have access", "do not have access", "no access to",
+  "cannot browse", "can't browse", "unable to browse", "recommend checking",
+  "recommend visiting", "recommend contacting", "best to visit", "best to contact",
+  "i'm not able to access", "i don't have current", "i do not have current",
+  "as of my last update", "my training data", "knowledge cutoff",
+]
+
+export function isAbstention(answer: string): boolean {
+  const l = answer.toLowerCase()
+  return ABSTENTIONS.some((a) => l.includes(a))
+}
+
 const HEDGES = [
   "i don't have", "i do not have", "i don't see", "i couldn't find", "cannot find",
   "unable to find", "no information", "not publicly", "i'm not able to",
@@ -677,10 +699,16 @@ export async function POST(req: NextRequest) {
     }
 
     const claims = questionSpecs.map(({ text: question, check }, i) => {
+      let abstained = 0
       const perEngine = runs
         .map((r) => {
           const a = r.answers[i]
           if (!a.ok) return null
+          // An engine that declines is excluded from the verdict entirely.
+          if (isAbstention(a.value.text)) {
+            abstained++
+            return null
+          }
           const { status, reason } = classifyClaim({
             answer: a.value.text,
             citations: a.value.citations,
@@ -712,10 +740,14 @@ export async function POST(req: NextRequest) {
           check,
           status: 'cant_confirm' as ClaimStatus,
           evidence: 'thin' as const,
+          engines_abstained: abstained,
           engines_answered: 0,
           engines_attempted: runs.length,
           decisive_engine: null,
-          reason: 'No engine answered this question.',
+          reason:
+            abstained > 0
+              ? `${abstained} engine(s) declined to answer (no live access).`
+              : 'No engine answered this question.',
           engines: [],
           ai_answer: 'No engine answered this question.',
           site_fact: null,
@@ -744,6 +776,7 @@ export async function POST(req: NextRequest) {
         check,
         status,
         evidence,
+        engines_abstained: abstained,
         engines_answered: perEngine.length,
         engines_attempted: runs.length,
         // Named so a thin finding can be read honestly: "OpenAI said X,

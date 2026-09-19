@@ -32,6 +32,7 @@ interface Claim {
   check: string
   evidence: 'full' | 'thin'
   engines_answered: number
+  engines_abstained: number
   engines_attempted: number
   decisive_engine: string | null
   status: ClaimStatus
@@ -411,6 +412,11 @@ export default function ClinicCheckPage() {
                           {claim.check && (
                             <span className="px-2 py-0.5 rounded-md text-[10px] border border-slate-700 text-slate-500 uppercase tracking-wide">
                               {claim.check.replace(/_/g, ' ')}
+                            </span>
+                          )}
+                          {claim.engines_abstained > 0 && (
+                            <span className="px-2 py-0.5 rounded-md text-[10px] border border-slate-700 text-slate-500">
+                              {claim.engines_abstained} declined
                             </span>
                           )}
                           {claim.evidence === 'thin' && claim.engines_answered > 0 && (
