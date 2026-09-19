@@ -220,6 +220,101 @@ const ENGINES: { name: EngineName; enabled: boolean; run: (p: string) => Promise
 ]
 
 /* ------------------------------------------------------------------ *
+ * Jev — System One meta-classifier
+ *
+ * Perplexity and OpenAI disagree because their live search returns
+ * different citations each run. Rather than let the worst engine win on
+ * citation-lottery outcomes, we ask TypeSafe's Jev model to look at the
+ * full claim context (site content + all engine answers + citations) and
+ * return a calibrated structured verdict. Jev is trained for consistency
+ * and returns confidence, so we can gate thin decisions.
+ * ------------------------------------------------------------------ */
+
+const JEV_VERDICT_CRITERIA: Record<ClaimStatus, string> = {
+  contradiction: 'A direct factual conflict exists between the AI answer and the official business site.',
+  foreign_source: 'The AI cites only unrelated businesses / look-alike brands, not this specific business.',
+  source_conflict: 'Third-party directories or other engines disagree with the official site.',
+  unsupported: 'The AI asserts a service, price, fact, or area that the business site does not support.',
+  not_named: 'The answer does not name the business at all.',
+  partial: 'Some details match the site, but others do not; incomplete confirmation.',
+  cant_confirm: 'Not enough reliable evidence to confirm or refute the claim.',
+  confirmed: 'The AI answer is fully supported by the official business site.',
+}
+
+async function queryJev(opts: {
+  question: string
+  check: UniversalCheck
+  businessName: string
+  businessDomain: string
+  location: string
+  siteContent: string
+  targetService: string | null
+  categoryService: string | null
+  perEngine: { engine: string; answer: string; citations: string[]; status: ClaimStatus; reason: string }[]
+}): Promise<{ status: ClaimStatus; reason: string; confidence: number } | null> {
+  const key = process.env.TYPESAFE_API_KEY
+  if (!key) return null
+
+  const state = `
+Business: ${opts.businessName}
+Location: ${opts.location}
+Website domain: ${opts.businessDomain}
+Question: ${opts.question}
+Check type: ${opts.check}
+Target service (from site): ${opts.targetService || 'none'}
+Category standard: ${opts.categoryService || 'none'}
+
+--- Official site content (first 6000 chars) ---
+${opts.siteContent.slice(0, 6000)}
+
+--- Engine answers ---
+${opts.perEngine
+  .map(
+    (e) =>
+      `[${e.engine}]\nStatus from rule classifier: ${e.status}\nAnswer: ${e.answer.slice(0, 1200)}\nCitations: ${e.citations.join(', ') || 'none'}`
+  )
+  .join('\n\n')}
+`
+
+  try {
+    const res = await fetch('https://api.typesafe.ai/v1/systemone', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        state,
+        model: 'jev-latest',
+        questions: {
+          verdict: {
+            type: 'choice',
+            instructions:
+              'You are a senior factual-research reviewer. Given the official business site content and the AI engine answers above, choose the single most accurate verdict. Base your decision on the official site content when it is available. If the site supports the claim and the AI answers are consistent with it, choose CONFIRMED. If the AI asserts something the site does not mention, choose UNSUPPORTED. If the AI cites only unrelated/look-alike businesses, choose FOREIGN_SOURCE. If directories disagree with the official site, choose SOURCE_CONFLICT.',
+            criteria: JEV_VERDICT_CRITERIA,
+          },
+        },
+      }),
+    })
+    if (!res.ok) {
+      console.error('Jev error:', res.status, await res.text())
+      return null
+    }
+    const data = await res.json()
+    const ans = data.answers?.verdict
+    if (!ans || !ans.choice) return null
+    return {
+      status: ans.choice as ClaimStatus,
+      reason: `Jev meta-classifier (${Math.round(ans.confidence * 100)}% confidence)`,
+      confidence: ans.confidence ?? 0,
+    }
+  } catch (err: any) {
+    console.error('Jev exception:', err.message)
+    return null
+  }
+}
+
+/* ------------------------------------------------------------------ *
  * Site scraping — homepage plus likely service/pricing pages
  * ------------------------------------------------------------------ */
 
@@ -870,6 +965,46 @@ export async function POST(req: NextRequest) {
         ),
       }
     })
+
+    // Jev meta-classifier pass: re-evaluate only claims where engines
+    // disagree. When all engines agree, the rule-based verdict is already
+    // stable and we save cost/latency. When they disagree, Jev sees the
+    // full context and returns a calibrated structured verdict.
+    if (process.env.TYPESAFE_API_KEY) {
+      for (let i = 0; i < claims.length; i++) {
+        const claim = claims[i]
+        if (claim.engines.length === 0) continue
+        const statuses = claim.engines.map((e) => e.status)
+        const allAgree = new Set(statuses).size === 1
+        // Also re-check foreign_source collisions; Jev is better at entity
+        // disambiguation than a domain-token heuristic.
+        const needsJev = !allAgree || claim.status === 'foreign_source' || claim.status === 'source_conflict'
+        if (!needsJev) continue
+        const jev = await queryJev({
+          question: claim.question,
+          check: questionSpecs[i].check,
+          businessName: clinic_name,
+          businessDomain: clinicDomain,
+          location,
+          siteContent,
+          targetService,
+          categoryService,
+          perEngine: claim.engines,
+        })
+        if (jev && jev.confidence >= 0.75) {
+          const oldStatus = claim.status
+          claim.status = jev.status
+          claim.reason = jev.reason
+          // recount summary
+          const wasFinding = FINDING_STATUSES.includes(oldStatus)
+          if (!wasFinding || claim.evidence === 'full') summary[oldStatus]--
+          else summary.cant_confirm--
+          const nowFinding = FINDING_STATUSES.includes(jev.status)
+          if (!nowFinding || claim.evidence === 'full') summary[jev.status]++
+          else summary.cant_confirm++
+        }
+      }
+    }
 
     const sellable =
       summary.contradiction + summary.unsupported + summary.source_conflict +
