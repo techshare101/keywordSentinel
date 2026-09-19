@@ -154,21 +154,35 @@ async function queryPerplexity(prompt: string): Promise<EngineAnswer> {
 }
 
 async function queryOpenAI(prompt: string): Promise<EngineAnswer> {
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+  // Responses API with web search. A plain chat-completions call has no
+  // live access, so it either abstains or answers from stale training
+  // data — neither reflects what a customer sees in ChatGPT.
+  const res = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 800,
+      model: process.env.OPENAI_MODEL || 'gpt-4.1',
+      input: prompt,
+      tools: [{ type: 'web_search' }],
     }),
   })
   if (!res.ok) throw new HttpError(res.status, `OpenAI ${res.status}: ${await res.text()}`)
   const data = await res.json()
-  return { text: data.choices?.[0]?.message?.content ?? '', citations: [] }
+
+  let text: string = data.output_text ?? ''
+  const citations = new Set<string>()
+  for (const item of data.output ?? []) {
+    for (const c of item.content ?? []) {
+      if (typeof c.text === 'string' && !text) text += c.text
+      for (const a of c.annotations ?? []) {
+        if (a.url) citations.add(a.url)
+      }
+    }
+  }
+  return { text, citations: Array.from(citations) }
 }
 
 async function queryGemini(prompt: string): Promise<EngineAnswer> {
@@ -178,7 +192,14 @@ async function queryGemini(prompt: string): Promise<EngineAnswer> {
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        // Without this, Gemini answers from parametric memory and invents
+        // addresses and prices. Consumer Gemini searches. An ungrounded
+        // call does not represent what a real user is shown, so any
+        // finding drawn from it is not defensible to a business owner.
+        tools: [{ google_search: {} }],
+      }),
     }
   )
   if (!res.ok) throw new HttpError(res.status, `Gemini ${res.status}: ${await res.text()}`)
@@ -341,11 +362,12 @@ const GENERIC_NAME_TOKENS = [
  * came back CAN'T CONFIRM while Perplexity had matched every field.
  */
 const ABSTENTIONS = [
-  "real-time", "real time", "don't have access", "do not have access", "no access to",
-  "cannot browse", "can't browse", "unable to browse", "recommend checking",
-  "recommend visiting", "recommend contacting", "best to visit", "best to contact",
-  "i'm not able to access", "i don't have current", "i do not have current",
-  "as of my last update", "my training data", "knowledge cutoff",
+  "real-time", "real time", "don't have access", "do not have access",
+  "no access to", "cannot browse", "can't browse", "unable to browse",
+  "recommend checking", "recommend visiting", "recommend contacting",
+  "best to visit", "best to contact", "i'm not able to access",
+  "i don't have current", "i do not have current", "as of my last update",
+  "my training data", "knowledge cutoff",
 ]
 
 export function isAbstention(answer: string): boolean {
