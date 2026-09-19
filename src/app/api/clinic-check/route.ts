@@ -275,6 +275,38 @@ function isOfficialCitation(citation: string, clinicDomain: string): boolean {
   return domain === clinicDomain || domain.endsWith(`.${clinicDomain}`)
 }
 
+/**
+ * Entity collision — the finding hiding inside the Morpheus8 row.
+ *
+ * Perplexity answered about "AesthetIQ Med Spa, Oakdale MN" using
+ * theaesthetiq.ai, aesthetiqph.com and njplasticsurg.com: different
+ * companies that share or resemble the brand name. The old rule missed
+ * it because mapquest.com was also cited, and one directory citation
+ * was enough to suppress FOREIGN_SOURCE.
+ *
+ * A specific factual assertion about a business with ZERO citations from
+ * that business's own domain is not supportable, whatever else is cited.
+ */
+function brandTokens(name: string): string[] {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')
+    .split(/\s+/)
+    .filter((t) => t.length > 3 && !GENERIC_NAME_TOKENS.includes(t))
+}
+
+function looksLikeBrandCollision(citations: string[], businessName: string, businessDomain: string): string[] {
+  const tokens = brandTokens(businessName)
+  if (tokens.length === 0) return []
+  return citations.filter((c) => {
+    const d = getDomain(c)
+    if (!d || d === businessDomain) return false
+    if (isDirectoryCitation(c)) return false
+    const host = d.replace(/\./g, '')
+    return tokens.some((t) => host.includes(t))
+  })
+}
+
 function isDirectoryCitation(citation: string): boolean {
   const domain = getDomain(citation)
   return DIRECTORY_DOMAINS.some((d) => domain === d || domain.endsWith(`.${d}`))
@@ -495,6 +527,13 @@ export function classifyClaim(opts: {
 
   /* ---- one named service ---- */
   if (check === 'named_service' || check === 'category_probe') {
+    const collisions = looksLikeBrandCollision(citations, clinicName, clinicDomain)
+    if (collisions.length > 0 && official.length === 0) {
+      return {
+        status: 'foreign_source',
+        reason: `Answered using look-alike brands, not this business: ${collisions.map(getDomain).join(', ')}.`,
+      }
+    }
     const service = (namedService(question, targetService, categoryService) || '').toLowerCase()
     const aiSaysYes = answer.toLowerCase().includes(service) && !/does not (?:appear to )?offer|no (?:public )?(?:evidence|indication)/i.test(answer)
     const siteHasIt = siteContent.toLowerCase().includes(service)
@@ -602,6 +641,16 @@ export function classifyClaim(opts: {
   }
 
   /* ---- general services ---- */
+  if (
+    citations.length > 0 &&
+    official.length === 0 &&
+    /their (?:official )?site|their website|on their page/i.test(answer)
+  ) {
+    return {
+      status: 'foreign_source',
+      reason: `Describes "their site" while citing none of it: ${citations.slice(0, 5).map(getDomain).join(', ')}.`,
+    }
+  }
   const aiServices = extractServices(answer, siteServices)
   if (siteServices.length === 0) {
     return { status: 'cant_confirm', reason: 'No services could be read from the site.' }

@@ -99,6 +99,29 @@ const TILE_LABELS: Record<ClaimStatus, string> = {
   cant_confirm: "Can't Confirm",
 }
 
+/** The PDF is a client-facing document. Raw markdown and mid-word cuts
+ *  make it look machine-generated. */
+function plain(text: string): string {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/#{1,6}\s*/g, '')
+    .replace(/\[(\d+)\]/g, '')
+    .replace(/\[(.*?)\]\(.*?\)/g, '$1')
+    .replace(/^\s*[-*]\s+/gm, '• ')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim()
+}
+
+/** Cut at a sentence boundary, never mid-word. */
+function clip(text: string, max: number): string {
+  if (text.length <= max) return text
+  const slice = text.slice(0, max)
+  const stop = Math.max(slice.lastIndexOf('. '), slice.lastIndexOf('\n'))
+  return (stop > max * 0.5 ? slice.slice(0, stop + 1) : slice.slice(0, slice.lastIndexOf(' '))) + ' …'
+}
+
 function getDomain(url: string): string {
   try {
     return new URL(url.startsWith('http') ? url : `https://${url}`).hostname.replace(/^www\./, '')
@@ -165,7 +188,7 @@ export default function ClinicCheckPage() {
     y += 16
     doc.setFontSize(10)
     doc.setTextColor(148, 163, 184)
-    doc.text(`${report.location} \u2014 ${report.website || 'no website'}`, m, y)
+    doc.text(`${report.location} — ${report.website || 'no website'}`, m, y)
     y += 20
 
     doc.setFontSize(9)
@@ -182,7 +205,7 @@ export default function ClinicCheckPage() {
       doc.setTextColor(251, 191, 36)
       doc.setFontSize(9)
       doc.text(
-        'PROBE ONLY \u2014 fewer than two engines answered. Not a finished report.',
+        'PROBE ONLY — fewer than two engines answered. Not a finished report.',
         m, y
       )
       y += 20
@@ -191,7 +214,7 @@ export default function ClinicCheckPage() {
     doc.setTextColor(255, 255, 255)
     doc.setFontSize(11)
     doc.text(
-      `Findings: ${report.sellable_findings}   \u00b7   Confirmed: ${report.summary.confirmed}   \u00b7   Can't confirm: ${report.summary.cant_confirm}`,
+      `Findings: ${report.sellable_findings}   ·   Confirmed: ${report.summary.confirmed}   ·   Not determinable: ${report.summary.cant_confirm}`,
       m, y
     )
     y += 22
@@ -219,11 +242,12 @@ export default function ClinicCheckPage() {
 
       doc.setTextColor(203, 213, 225)
       doc.setFontSize(8)
-      doc.text(doc.splitTextToSize(`Why: ${claim.reason}`, W - m * 2 - 20), m + 10, y + 52)
+      doc.text(doc.splitTextToSize(`Why: ${plain(claim.reason)}`, W - m * 2 - 20), m + 10, y + 52)
 
       doc.setTextColor(148, 163, 184)
+      const who = claim.decisive_engine ? `${claim.decisive_engine} said:` : 'AI said:'
       doc.text(
-        doc.splitTextToSize(`AI: ${claim.ai_answer.slice(0, 400)}`, W - m * 2 - 20),
+        doc.splitTextToSize(`${who} ${clip(plain(claim.ai_answer), 380)}`, W - m * 2 - 20),
         m + 10, y + 72
       )
 
@@ -276,7 +300,7 @@ export default function ClinicCheckPage() {
           className="mb-8 px-6 py-3 bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 rounded-xl font-semibold text-white flex items-center gap-2 disabled:opacity-50"
         >
           {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Search className="h-5 w-5" />}
-          {loading ? 'Running\u2026' : 'Run Clinic Check'}
+          {loading ? 'Running…' : 'Run Clinic Check'}
         </button>
 
         {error && (
@@ -295,11 +319,11 @@ export default function ClinicCheckPage() {
                     </span>
                   )}
                 </div>
-                <p className="text-slate-400">{report.location} \u2014 {report.website || 'no website'}</p>
+                <p className="text-slate-400">{report.location} — {report.website || 'no website'}</p>
                 {report.site_services?.length > 0 && (
                   <p className="text-slate-500 text-xs mt-1">
                     Services read from site ({report.site_services.length}): {report.site_services.slice(0, 8).join(', ')}
-                    {report.site_services.length > 8 ? '\u2026' : ''}
+                    {report.site_services.length > 8 ? '…' : ''}
                   </p>
                 )}
                 {report.target_service && (
@@ -310,7 +334,7 @@ export default function ClinicCheckPage() {
                 )}
                 {report.scraped_pages?.length > 0 && (
                   <p className="text-slate-500 text-xs mt-1">
-                    Scraped: {report.scraped_pages.map(getDomain).length} page(s) \u2014 {report.scraped_pages.join(', ')}
+                    Scraped: {report.scraped_pages.map(getDomain).length} page(s) — {report.scraped_pages.join(', ')}
                   </p>
                 )}
                 {report.scrape_error && (
@@ -360,7 +384,7 @@ export default function ClinicCheckPage() {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <div className="text-xs uppercase tracking-wide text-slate-500">
-                  Findings <span className="text-slate-600">\u00b7 corroborated by {report.min_engines_for_finding}+ engines</span>
+                  Findings <span className="text-slate-600">· corroborated by {report.min_engines_for_finding}+ engines</span>
                 </div>
                 {report.thin_claims > 0 && (
                   <div className="text-xs text-amber-400/80">
@@ -421,7 +445,7 @@ export default function ClinicCheckPage() {
                           )}
                           {claim.evidence === 'thin' && claim.engines_answered > 0 && (
                             <span className="px-2 py-0.5 rounded-md text-[10px] border border-amber-500/30 text-amber-400">
-                              thin \u2014 {claim.engines_answered}/{claim.engines_attempted} engines
+                              thin — {claim.engines_answered}/{claim.engines_attempted} engines
                             </span>
                           )}
                           {claim.engines.length > 1 && (
