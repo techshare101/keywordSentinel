@@ -20,6 +20,8 @@ import {
   Crown,
   Menu,
   X,
+  Compass,
+  Stethoscope,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { PLANS, getEffectivePlan } from '@/lib/plans'
@@ -33,6 +35,8 @@ const navigation = [
   { name: 'Keywords', href: '/dashboard/keywords', icon: Search },
   { name: 'Matches', href: '/dashboard/matches', icon: TrendingUp },
   { name: 'Leads', href: '/dashboard/leads', icon: Flame },
+  { name: 'Signal Map', href: '/dashboard/signal-map', icon: Compass },
+  { name: 'Clinic Check', href: '/dashboard/clinic-check', icon: Stethoscope },
   { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
   { name: 'Activity', href: '/dashboard/activity', icon: Activity },
   { name: 'Competitors', href: '/dashboard/competitors', icon: Target },

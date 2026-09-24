@@ -1,0 +1,127 @@
+import type { SignalConnector, SignalConnectorInput, SignalConnectorResult, YouTubeChannel } from '@/types/signal-map'
+import { fetchWithTimeout, extractSearchQuery } from '../utils'
+
+const TREG_URL = 'https://treg.to'
+
+function parseSubscriberCount(text: string | undefined): number | undefined {
+  if (!text) return undefined
+  // Parse strings like "2.24K subscribers", "1.5M subscribers", "500 subscribers"
+  const match = text.toLowerCase().match(/([\d.]+)\s*(k|m)?/)
+  if (!match) return undefined
+  const num = parseFloat(match[1])
+  const suffix = match[2]
+  if (suffix === 'k') return Math.round(num * 1000)
+  if (suffix === 'm') return Math.round(num * 1000000)
+  return Math.round(num)
+}
+
+export class YouTubeChannelsConnector implements SignalConnector {
+  id = 'youtube_channels'
+  name = 'YouTube Channels'
+  section_type = 'youtube_channels' as const
+
+  async fetch(input: SignalConnectorInput): Promise<SignalConnectorResult> {
+    const { icp_description, report_id } = input
+    const token = process.env.TREG_API_KEY
+
+    if (!token) {
+      return {
+        section_type: this.section_type,
+        status: 'no_data',
+        data: { channels: [] },
+        sources: [],
+        raw_fetches: [],
+        error_message: 'TREG_API_KEY not configured',
+      }
+    }
+
+    const query = extractSearchQuery(icp_description)
+    const endpoint = 'tikhub.x.youtube-web-v2-search-channels'
+    const requestUrl = `${TREG_URL}/call/${endpoint}?keyword=${encodeURIComponent(query)}&need_format=true`
+    const startTime = Date.now()
+
+    try {
+      console.log(`[YouTubeChannelsConnector] Searching YouTube for: ${query}`)
+      const response = await fetchWithTimeout(requestUrl, {
+        method: 'GET',
+        headers: { 'X-Treg-Token': token },
+      }, 30000)
+
+      const latencyMs = Date.now() - startTime
+      const result = await response.json()
+
+      if (!response.ok) {
+        console.error(`[YouTubeChannelsConnector] treg returned ${response.status}:`, result)
+        return {
+          section_type: this.section_type,
+          status: 'no_data',
+          data: { channels: [] },
+          sources: [],
+          raw_fetches: [{
+            report_id,
+            connector_id: this.id,
+            source: 'treg/youtube',
+            request_url: requestUrl,
+            request_params: { keyword: query },
+            response_body: result,
+            response_status: response.status,
+            latency_ms: latencyMs,
+          }],
+          error_message: `treg API error: ${response.status}`,
+        }
+      }
+
+      const rawChannels = result?.data?.channels || []
+      const channels: YouTubeChannel[] = rawChannels.slice(0, 20).map((ch: any) => ({
+        channel_id: ch.channel_id || '',
+        name: ch.title || 'Unknown',
+        description: (ch.description || '').slice(0, 200),
+        subscriber_count: parseSubscriberCount(ch.subscriber_count_text),
+        video_count: ch.video_count,
+        channel_url: ch.channel_url || `https://www.youtube.com/channel/${ch.channel_id}`,
+        thumbnail_url: ch.thumbnails?.[0]?.url ? `https:${ch.thumbnails[0].url}` : undefined,
+      }))
+
+      return {
+        section_type: this.section_type,
+        status: channels.length > 0 ? 'completed' : 'no_data',
+        data: { channels, total_found: channels.length },
+        sources: [{
+          source: 'youtube',
+          url: 'https://www.youtube.com',
+          description: `YouTube channel search for "${query}"`,
+          fetched_at: new Date().toISOString(),
+        }],
+        raw_fetches: [{
+          report_id,
+          connector_id: this.id,
+          source: 'treg/youtube',
+          request_url: requestUrl,
+          request_params: { keyword: query },
+          response_body: { channel_count: rawChannels.length },
+          response_status: response.status,
+          latency_ms: latencyMs,
+        }],
+      }
+    } catch (error) {
+      console.error('[YouTubeChannelsConnector] Error:', error)
+      return {
+        section_type: this.section_type,
+        status: 'error',
+        data: { channels: [] },
+        sources: [],
+        raw_fetches: [{
+          report_id,
+          connector_id: this.id,
+          source: 'treg/youtube',
+          request_url: requestUrl,
+          request_params: { keyword: query },
+          response_body: { error: String(error) },
+          response_status: 500,
+          latency_ms: Date.now() - startTime,
+        }],
+        error_message: error instanceof Error ? error.message : 'Unknown error',
+      }
+    }
+  }
+}
